@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>קנה חכם - השוואת מחירים</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== SCREEN: HOME ===== -->
+  <div id="screen-home" class="screen active">
+    <div class="home-header">
+      <div class="logo">
+        <span class="logo-icon">🛒</span>
+        <span class="logo-text">קנה חכם</span>
+      </div>
+      <p class="logo-sub">סרוק מוצר וקבל את המחיר הכי טוב</p>
+    </div>
+
+    <div class="home-actions">
+      <button class="action-btn primary" onclick="startBarcodeScanner()">
+        <span class="btn-icon">📷</span>
+        <span class="btn-label">סרוק ברקוד</span>
+        <span class="btn-sub">מהיר ומדויק</span>
+      </button>
+
+      <button class="action-btn secondary" onclick="startImageCapture()">
+        <span class="btn-icon">🔍</span>
+        <span class="btn-label">צלם מוצר</span>
+        <span class="btn-sub">זיהוי חכם ע"י AI</span>
+      </button>
+
+      <div class="divider"><span>או</span></div>
+
+      <div class="manual-input-wrap">
+        <input type="text" id="manual-barcode" placeholder="הכנס ברקוד ידנית..." inputmode="numeric">
+        <button onclick="searchManual()">חפש</button>
+      </div>
+    </div>
+
+    <div class="recent-section" id="recent-section" style="display:none">
+      <h3>סריקות אחרונות</h3>
+      <div id="recent-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN: BARCODE SCANNER ===== -->
+  <div id="screen-scanner" class="screen">
+    <div class="scanner-header">
+      <button class="back-btn" onclick="goHome()">&#8594; חזרה</button>
+      <h2>סרוק ברקוד</h2>
+    </div>
+    <div class="scanner-container">
+      <div id="interactive" class="viewport"></div>
+      <div class="scanner-overlay">
+        <div class="scanner-frame">
+          <div class="corner tl"></div>
+          <div class="corner tr"></div>
+          <div class="corner bl"></div>
+          <div class="corner br"></div>
+          <div class="scan-line"></div>
+        </div>
+        <p class="scanner-hint">מקם את הברקוד בתוך המסגרת</p>
+      </div>
+    </div>
+    <div class="scanner-status" id="scanner-status">מחפש ברקוד...</div>
+  </div>
+
+  <!-- ===== SCREEN: IMAGE CAPTURE ===== -->
+  <div id="screen-image" class="screen">
+    <div class="scanner-header">
+      <button class="back-btn" onclick="goHome()">&#8594; חזרה</button>
+      <h2>צלם מוצר</h2>
+    </div>
+    <div class="camera-container">
+      <video id="camera-video" autoplay playsinline></video>
+      <canvas id="camera-canvas" style="display:none"></canvas>
+    </div>
+    <div class="camera-controls">
+      <button class="capture-btn" onclick="captureImage()">
+        <span>📸</span> צלם
+      </button>
+    </div>
+    <div id="captured-preview" style="display:none">
+      <img id="captured-img" src="" alt="תמונה שצולמה">
+      <div class="preview-actions">
+        <button class="btn-confirm" onclick="analyzeImage()">נתח תמונה</button>
+        <button class="btn-retake" onclick="retakePhoto()">צלם שוב</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN: LOADING ===== -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p id="loading-text">מחפש מחירים...</p>
+      <div class="loading-steps">
+        <div class="step" id="step-identify">
+          <span class="step-icon">🔍</span>
+          <span class="step-text">מזהה מוצר</span>
+        </div>
+        <div class="step" id="step-prices">
+          <span class="step-icon">💰</span>
+          <span class="step-text">בודק מחירים ברשתות</span>
+        </div>
+        <div class="step" id="step-compare">
+          <span class="step-icon">📊</span>
+          <span class="step-text">משווה ומחשב</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN: RESULTS ===== -->
+  <div id="screen-results" class="screen">
+    <div class="results-header">
+      <button class="back-btn" onclick="goHome()">&#8594; סריקה חדשה</button>
+      <h2>תוצאות השוואה</h2>
+    </div>
+
+    <!-- Product Info Card -->
+    <div class="product-card" id="product-card">
+      <div class="product-image-wrap">
+        <img id="result-product-img" src="" alt="">
+        <div class="product-image-placeholder" id="product-img-placeholder">🛍️</div>
+      </div>
+      <div class="product-info">
+        <h3 id="result-product-name">שם המוצר</h3>
+        <p id="result-product-brand">מותג</p>
+        <p id="result-product-size">גודל/משקל</p>
+      </div>
+    </div>
+
+    <!-- Best Deal Banner -->
+    <div class="best-deal-banner" id="best-deal-banner">
+      <span class="deal-icon">🏆</span>
+      <div class="deal-text">
+        <strong id="deal-title">העסקה הכי טובה</strong>
+        <span id="deal-subtitle"></span>
+      </div>
+      <span class="deal-price" id="deal-price"></span>
+    </div>
+
+    <!-- Current Price -->
+    <div class="section-label">המחיר שלפניך עכשיו</div>
+    <div class="current-price-card" id="current-price-card">
+      <span class="store-name" id="current-store">-</span>
+      <span class="price-value" id="current-price">-</span>
+      <span class="price-per-unit" id="current-per-unit"></span>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="section-label">השוואה מלאה</div>
+    <div class="comparison-table" id="comparison-table">
+      <!-- Rows injected by JS -->
+    </div>
+
+    <!-- Savings Summary -->
+    <div class="savings-card" id="savings-card">
+      <span class="savings-label">תחסוך</span>
+      <span class="savings-amount" id="savings-amount">₪0</span>
+      <span class="savings-desc" id="savings-desc">אם תקנה את הכי זול</span>
+    </div>
+
+    <button class="scan-again-btn" onclick="goHome()">🔄 סרוק מוצר נוסף</button>
+  </div>
+
+  <!-- ===== SCREEN: ERROR ===== -->
+  <div id="screen-error" class="screen">
+    <div class="error-content">
+      <div class="error-icon">😕</div>
+      <h2 id="error-title">לא נמצאו תוצאות</h2>
+      <p id="error-message">לא הצלחנו לזהות את המוצר</p>
+      <button class="retry-btn" onclick="goHome()">נסה שוב</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
