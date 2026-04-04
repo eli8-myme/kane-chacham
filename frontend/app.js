@@ -247,30 +247,48 @@ function searchManual() {
 async function searchProduct(data, type) {
   showScreen('loading');
   const steps = ['step-identify', 'step-prices', 'step-compare'];
+  const loadingText = document.getElementById('loading-text');
 
-  // אנימציית צעדים
-  for (let i = 0; i < steps.length; i++) {
-    if (i > 0) document.getElementById(steps[i-1]).classList.replace('active', 'done');
-    document.getElementById(steps[i]).classList.add('active');
-    await delay(600);
-  }
+  // Reset steps
+  steps.forEach(s => { document.getElementById(s).classList.remove('active', 'done'); });
 
   try {
+    // שלב 1: זיהוי
+    document.getElementById(steps[0]).classList.add('active');
+    loadingText.textContent = type === 'image' ? 'שולח תמונה ל-AI לזיהוי...' : `מחפש ברקוד: ${data}`;
+
     let result;
 
     if (type === 'barcode') {
       result = await fetchPrices({ barcode: data });
     } else {
-      // image: שלח base64 לבקאנד
       const base64 = data.split(',')[1];
+      if (!base64) {
+        showError('שגיאה בתמונה', 'לא הצלחנו לעבד את התמונה. נסה לצלם שוב.');
+        return;
+      }
       result = await fetchPrices({ image_base64: base64 });
     }
 
-    document.getElementById(steps[2]).classList.replace('active', 'done');
+    // שלב 2: מחירים
+    document.getElementById(steps[0]).classList.replace('active', 'done');
+    document.getElementById(steps[1]).classList.add('active');
+    loadingText.textContent = 'בודק מחירים...';
     await delay(300);
 
+    // שלב 3: השוואה
+    document.getElementById(steps[1]).classList.replace('active', 'done');
+    document.getElementById(steps[2]).classList.add('active');
+    loadingText.textContent = 'מחשב השוואה...';
+    await delay(300);
+
+    document.getElementById(steps[2]).classList.replace('active', 'done');
+
     if (!result || !result.product) {
-      showError('המוצר לא נמצא', 'לא הצלחנו למצוא מידע על המוצר הזה');
+      const detail = type === 'image'
+        ? 'לא הצלחנו לזהות את המוצר מהתמונה. נסה לצלם מקרוב יותר, עם תאורה טובה.'
+        : `ברקוד ${data} לא נמצא במאגר.`;
+      showError('המוצר לא נמצא', detail);
       return;
     }
 
@@ -278,8 +296,8 @@ async function searchProduct(data, type) {
     displayResults(result);
 
   } catch (err) {
-    console.error(err);
-    showError('שגיאה בחיבור לשרת', err.message || 'אנא נסה שוב');
+    console.error('Search error:', err);
+    showError('שגיאה', `${err.message || 'שגיאה לא צפויה'}`);
   }
 }
 
@@ -368,18 +386,23 @@ async function fetchDemoPrices(payload) {
 
 // ===== GEMINI VISION =====
 async function identifyWithGemini(base64Image) {
+  const loadingText = document.getElementById('loading-text');
+
   try {
+    loadingText.textContent = 'שולח תמונה ל-Gemini AI...';
+    console.log('Sending image to Gemini, size:', Math.round(base64Image.length / 1024) + 'KB');
+
     const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [
-            { text: `אתה מומחה לזיהוי מוצרי סופרמרקט ישראליים.
-תסתכל על התמונה וזהה את המוצר.
-החזר JSON בלבד (ללא markdown, ללא backticks) במבנה הבא:
-{"name":"שם המוצר בעברית","brand":"מותג","size":"גודל","size_value":500,"size_unit":"g","barcode":"ברקוד אם נראה או null","category":"קטגוריה","price":"מחיר אם נראה על תג מחיר או null"}
-אם לא מצליח לזהות החזר: {"error":"לא ניתן לזהות"}` },
+            { text: `You are an expert at identifying Israeli supermarket products.
+Look at the image and identify the product.
+Return ONLY valid JSON (no markdown, no backticks, no extra text) in this format:
+{"name":"product name in Hebrew","brand":"brand name","size":"size description","size_value":500,"size_unit":"g","barcode":"barcode if visible or null","category":"category in Hebrew","price":"price if visible on tag or null"}
+If you cannot identify the product return: {"error":"cannot identify"}` },
             { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
           ]
         }],
@@ -388,12 +411,22 @@ async function identifyWithGemini(base64Image) {
     });
 
     if (!response.ok) {
-      console.error('Gemini API error:', response.status);
+      const errBody = await response.text();
+      console.error('Gemini API error:', response.status, errBody);
+      loadingText.textContent = `שגיאת API: ${response.status}`;
       return null;
     }
 
     const data = await response.json();
+    console.log('Gemini raw response:', JSON.stringify(data).substring(0, 500));
+
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    if (!text) {
+      console.error('Gemini returned empty response');
+      loadingText.textContent = 'Gemini לא החזיר תשובה';
+      return null;
+    }
 
     // נקה JSON מ-markdown
     text = text.trim();
@@ -401,17 +434,22 @@ async function identifyWithGemini(base64Image) {
       text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
     }
 
+    console.log('Gemini cleaned text:', text);
+
     const result = JSON.parse(text);
     if (result.error) {
       console.warn('Gemini could not identify:', result.error);
+      loadingText.textContent = 'AI לא הצליח לזהות את המוצר';
       return null;
     }
 
+    loadingText.textContent = `זוהה: ${result.name || 'מוצר'}`;
     console.log('Gemini identified:', result);
     return result;
 
   } catch (err) {
     console.error('Gemini Vision error:', err);
+    loadingText.textContent = `שגיאה: ${err.message}`;
     return null;
   }
 }
