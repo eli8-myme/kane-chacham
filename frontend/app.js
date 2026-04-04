@@ -6,6 +6,10 @@ const API_BASE = window.location.hostname === 'localhost'
 // Demo mode: עובד בלי backend עם נתונים מקומיים
 const DEMO_MODE = true;
 
+// Gemini Vision API - זיהוי מוצרים מתמונה
+const GEMINI_API_KEY = 'AIzaSyClIAHrYJrgqiL0LmO32U7kjk8JQMSWNYs';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
 // ===== DEMO DATABASE =====
 // מוצרים אמיתיים לדוגמה מסופרמרקטים ישראליים
 const DEMO_PRODUCTS = {
@@ -297,7 +301,7 @@ async function fetchPrices(payload) {
   return response.json();
 }
 
-function fetchDemoPrices(payload) {
+async function fetchDemoPrices(payload) {
   if (payload.barcode) {
     const data = DEMO_PRODUCTS[payload.barcode];
     if (data) {
@@ -319,19 +323,158 @@ function fetchDemoPrices(payload) {
   }
 
   if (payload.image_base64) {
-    // בדמו: מחזיר מוצר אקראי מה-DB
-    const keys = Object.keys(DEMO_PRODUCTS);
-    const key = keys[Math.floor(Math.random() * keys.length)];
-    const data = DEMO_PRODUCTS[key];
-    return {
-      product: { ...data.product, name: data.product.name + " (זוהה מתמונה)" },
-      current_store: "שופרסל",
-      current_price: data.comparisons.find(c => c.is_current)?.price || data.comparisons[0].price,
-      comparisons: data.comparisons,
-    };
+    // שלח ל-Gemini Vision לזיהוי אמיתי
+    const identified = await identifyWithGemini(payload.image_base64);
+
+    if (identified) {
+      // חפש ב-DB לפי ברקוד שזוהה
+      if (identified.barcode && DEMO_PRODUCTS[identified.barcode]) {
+        const data = DEMO_PRODUCTS[identified.barcode];
+        return {
+          product: data.product,
+          current_store: "שופרסל",
+          current_price: data.comparisons.find(c => c.is_current)?.price || data.comparisons[0].price,
+          comparisons: data.comparisons,
+        };
+      }
+
+      // חפש לפי שם מוצר ב-DB
+      const match = findProductByName(identified.name);
+      if (match) {
+        return {
+          product: { ...match.product, name: identified.name || match.product.name },
+          current_store: "שופרסל",
+          current_price: match.comparisons.find(c => c.is_current)?.price || match.comparisons[0].price,
+          comparisons: match.comparisons,
+        };
+      }
+
+      // מוצר זוהה אבל לא ב-DB - צור דמו עם הפרטים שזוהו
+      const gen = generateDemoForIdentified(identified);
+      return {
+        product: gen.product,
+        current_store: gen.comparisons[0].store_name,
+        current_price: gen.comparisons[0].price,
+        comparisons: gen.comparisons,
+      };
+    }
+
+    // Gemini נכשל - fallback
+    return null;
   }
 
   return null;
+}
+
+// ===== GEMINI VISION =====
+async function identifyWithGemini(base64Image) {
+  try {
+    const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: `אתה מומחה לזיהוי מוצרי סופרמרקט ישראליים.
+תסתכל על התמונה וזהה את המוצר.
+החזר JSON בלבד (ללא markdown, ללא backticks) במבנה הבא:
+{"name":"שם המוצר בעברית","brand":"מותג","size":"גודל","size_value":500,"size_unit":"g","barcode":"ברקוד אם נראה או null","category":"קטגוריה","price":"מחיר אם נראה על תג מחיר או null"}
+אם לא מצליח לזהות החזר: {"error":"לא ניתן לזהות"}` },
+            { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
+          ]
+        }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 512 }
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Gemini API error:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // נקה JSON מ-markdown
+    text = text.trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    }
+
+    const result = JSON.parse(text);
+    if (result.error) {
+      console.warn('Gemini could not identify:', result.error);
+      return null;
+    }
+
+    console.log('Gemini identified:', result);
+    return result;
+
+  } catch (err) {
+    console.error('Gemini Vision error:', err);
+    return null;
+  }
+}
+
+// חיפוש מוצר לפי שם ב-DEMO_PRODUCTS
+function findProductByName(name) {
+  if (!name) return null;
+  const lower = name.toLowerCase();
+
+  for (const key of Object.keys(DEMO_PRODUCTS)) {
+    const p = DEMO_PRODUCTS[key].product;
+    if (lower.includes(p.name.toLowerCase()) ||
+        p.name.toLowerCase().includes(lower) ||
+        (p.brand && lower.includes(p.brand.toLowerCase()))) {
+      return DEMO_PRODUCTS[key];
+    }
+  }
+
+  // חיפוש חלקי - מילים בודדות
+  const words = lower.split(/\s+/).filter(w => w.length > 2);
+  for (const key of Object.keys(DEMO_PRODUCTS)) {
+    const p = DEMO_PRODUCTS[key].product;
+    const productText = `${p.name} ${p.brand} ${p.category}`.toLowerCase();
+    const matchCount = words.filter(w => productText.includes(w)).length;
+    if (matchCount >= 2 || (words.length === 1 && matchCount === 1)) {
+      return DEMO_PRODUCTS[key];
+    }
+  }
+
+  return null;
+}
+
+// דמו למוצר שזוהה ע"י Gemini אבל לא ב-DB
+function generateDemoForIdentified(identified) {
+  const stores = ["שופרסל", "רמי לוי", "ויקטורי", "מגה", "יינות ביתן"];
+  const basePrice = identified.price ? parseFloat(identified.price) : (8 + Math.random() * 35);
+  const sizeVal = identified.size_value || 500;
+  const sizeUnit = identified.size_unit || 'g';
+  const sizeStr = identified.size || `${sizeVal} ${sizeUnit}`;
+
+  const comparisons = stores.map((store, i) => {
+    const price = Math.round((basePrice * (0.85 + Math.random() * 0.35)) * 100) / 100;
+    return {
+      store_name: store,
+      store_chain: store,
+      price,
+      price_per_unit: Math.round((price / sizeVal * 100) * 100) / 100,
+      size: sizeStr,
+      is_current: i === 0,
+    };
+  });
+
+  return {
+    product: {
+      barcode: identified.barcode || null,
+      name: identified.name || 'מוצר שזוהה',
+      brand: identified.brand || '',
+      size: sizeStr,
+      category: identified.category || 'כללי',
+      image_url: '',
+    },
+    comparisons,
+  };
 }
 
 // ===== DISPLAY RESULTS =====
