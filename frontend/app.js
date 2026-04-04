@@ -3,6 +3,105 @@ const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : 'https://your-backend.onrender.com'; // יתעדכן בהעלאה
 
+// Demo mode: עובד בלי backend עם נתונים מקומיים
+const DEMO_MODE = true;
+
+// ===== DEMO DATABASE =====
+// מוצרים אמיתיים לדוגמה מסופרמרקטים ישראליים
+const DEMO_PRODUCTS = {
+  "7290000066318": {
+    product: { barcode: "7290000066318", name: "חלב תנובה 3%", brand: "תנובה", size: "1 ליטר", category: "חלב", image_url: "" },
+    comparisons: [
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 5.90, price_per_unit: 0.59, size: "1 ליטר", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 6.50, price_per_unit: 0.65, size: "1 ליטר", is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 6.20, price_per_unit: 0.62, size: "1 ליטר", is_current: false },
+      { store_name: "מגה", store_chain: "mega", price: 6.40, price_per_unit: 0.64, size: "1 ליטר", is_current: false },
+      { store_name: "יינות ביתן", store_chain: "yeinot_bitan", price: 6.30, price_per_unit: 0.63, size: "1 ליטר", is_current: false },
+    ]
+  },
+  "7290004131609": {
+    product: { barcode: "7290004131609", name: "קוטג' תנובה 5%", brand: "תנובה", size: "250 גרם", category: "מוצרי חלב", image_url: "" },
+    comparisons: [
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 5.20, price_per_unit: 2.08, size: "250 גרם", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 6.10, price_per_unit: 2.44, size: "250 גרם", is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 5.50, price_per_unit: 2.20, size: "250 גרם", is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 9.90, price_per_unit: 1.98, size: "500 גרם", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 11.50, price_per_unit: 2.30, size: "500 גרם", is_current: false },
+    ]
+  },
+  "7290000307268": {
+    product: { barcode: "7290000307268", name: "במבה אסם", brand: "אסם", size: "80 גרם", category: "חטיפים", image_url: "" },
+    comparisons: [
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 4.90, price_per_unit: 6.13, size: "80 גרם", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 5.90, price_per_unit: 7.38, size: "80 גרם", is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 5.20, price_per_unit: 6.50, size: "80 גרם", is_current: false },
+      { store_name: "מגה", store_chain: "mega", price: 5.50, price_per_unit: 6.88, size: "80 גרם", is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 11.90, price_per_unit: 4.96, size: "240 גרם (מארז)", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 13.90, price_per_unit: 5.79, size: "240 גרם (מארז)", is_current: false },
+    ]
+  },
+  "7290000563534": {
+    product: { barcode: "7290000563534", name: "שמן זית שמן הבית", brand: "שמן הבית", size: "750 מ\"ל", category: "שמנים", image_url: "" },
+    comparisons: [
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 24.90, price_per_unit: 3.32, size: "750 מ\"ל", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 29.90, price_per_unit: 3.99, size: "750 מ\"ל", is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 26.90, price_per_unit: 3.59, size: "750 מ\"ל", is_current: false },
+      { store_name: "מגה", store_chain: "mega", price: 27.50, price_per_unit: 3.67, size: "750 מ\"ל", is_current: false },
+    ]
+  },
+  "7290106809369": {
+    product: { barcode: "7290106809369", name: "אבקת כביסה סנו מקסימה", brand: "סנו", size: "2.5 ק\"ג", category: "ניקוי", image_url: "" },
+    comparisons: [
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 34.90, price_per_unit: 1.40, size: "2.5 ק\"ג", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 42.90, price_per_unit: 1.72, size: "2.5 ק\"ג", is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 37.90, price_per_unit: 1.52, size: "2.5 ק\"ג", is_current: false },
+      { store_name: "אושר עד", store_chain: "osher_ad", price: 35.90, price_per_unit: 1.44, size: "2.5 ק\"ג", is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 54.90, price_per_unit: 1.10, size: "5 ק\"ג", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 64.90, price_per_unit: 1.30, size: "5 ק\"ג", is_current: false },
+    ]
+  },
+  "7290000197067": {
+    product: { barcode: "7290000197067", name: "קפה עלית נמס", brand: "עלית", size: "200 גרם", category: "קפה", image_url: "" },
+    comparisons: [
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 18.90, price_per_unit: 9.45, size: "200 גרם", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 22.90, price_per_unit: 11.45, size: "200 גרם", is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 19.90, price_per_unit: 9.95, size: "200 גרם", is_current: false },
+      { store_name: "מגה", store_chain: "mega", price: 21.90, price_per_unit: 10.95, size: "200 גרם", is_current: false },
+    ]
+  },
+  "7290000100517": {
+    product: { barcode: "7290000100517", name: "סבון כלים פיירי", brand: "Fairy", size: "500 מ\"ל", category: "ניקוי", image_url: "" },
+    comparisons: [
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 9.90, price_per_unit: 1.98, size: "500 מ\"ל", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 12.90, price_per_unit: 2.58, size: "500 מ\"ל", is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 10.90, price_per_unit: 2.18, size: "500 מ\"ל", is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 19.90, price_per_unit: 1.99, size: "1 ליטר", is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 16.90, price_per_unit: 1.69, size: "1 ליטר", is_current: false },
+    ]
+  },
+};
+
+// דמו דינמי: מייצר נתונים למוצרים שלא ב-DB
+function generateDemoForBarcode(barcode) {
+  const names = ["מוצר לדוגמה", "פריט סופרמרקט", "מוצר מזון", "מוצר ניקוי"];
+  const stores = ["שופרסל", "רמי לוי", "ויקטורי", "מגה", "יינות ביתן"];
+  const basePrice = 8 + Math.random() * 35;
+
+  const comparisons = stores.map((store, i) => ({
+    store_name: store,
+    store_chain: store,
+    price: Math.round((basePrice * (0.85 + Math.random() * 0.35)) * 100) / 100,
+    price_per_unit: Math.round((basePrice * (0.85 + Math.random() * 0.35) / 5) * 100) / 100,
+    size: "500 גרם",
+    is_current: i === 0,
+  }));
+
+  return {
+    product: { barcode, name: `מוצר ${barcode.slice(-4)}`, brand: "כללי", size: "500 גרם", category: "כללי", image_url: "" },
+    comparisons,
+  };
+}
+
 // ===== SCREEN MANAGER =====
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -182,6 +281,12 @@ async function searchProduct(data, type) {
 
 // ===== API CALL =====
 async function fetchPrices(payload) {
+  // Demo mode: שימוש בנתונים מקומיים
+  if (DEMO_MODE) {
+    await delay(300); // סימולציה של חיפוש
+    return fetchDemoPrices(payload);
+  }
+
   const response = await fetch(`${API_BASE}/api/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -190,6 +295,43 @@ async function fetchPrices(payload) {
 
   if (!response.ok) throw new Error(`Server error: ${response.status}`);
   return response.json();
+}
+
+function fetchDemoPrices(payload) {
+  if (payload.barcode) {
+    const data = DEMO_PRODUCTS[payload.barcode];
+    if (data) {
+      return {
+        product: data.product,
+        current_store: "שופרסל",
+        current_price: data.comparisons.find(c => c.is_current)?.price || data.comparisons[0].price,
+        comparisons: data.comparisons,
+      };
+    }
+    // ברקוד לא מוכר - צור דמו דינמי
+    const gen = generateDemoForBarcode(payload.barcode);
+    return {
+      product: gen.product,
+      current_store: gen.comparisons[0].store_name,
+      current_price: gen.comparisons[0].price,
+      comparisons: gen.comparisons,
+    };
+  }
+
+  if (payload.image_base64) {
+    // בדמו: מחזיר מוצר אקראי מה-DB
+    const keys = Object.keys(DEMO_PRODUCTS);
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    const data = DEMO_PRODUCTS[key];
+    return {
+      product: { ...data.product, name: data.product.name + " (זוהה מתמונה)" },
+      current_store: "שופרסל",
+      current_price: data.comparisons.find(c => c.is_current)?.price || data.comparisons[0].price,
+      comparisons: data.comparisons,
+    };
+  }
+
+  return null;
 }
 
 // ===== DISPLAY RESULTS =====

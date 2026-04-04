@@ -374,3 +374,29 @@ html, body {
   cursor: pointer;
 }
 .recent-item:hover { background: #f5f5f5; }
+
+/* ===== DEMO SECTION ===== */
+.demo-section { padding: 0 20px 16px; }
+.demo-section h3 { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px; }
+.demo-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.demo-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px; background: white; border-radius: 12px;
+  box-shadow: var(--shadow); cursor: pointer;
+  transition: transform 0.1s;
+}
+.demo-item:active { transform: scale(0.97); }
+.demo-emoji { font-size: 1.6rem; }
+.demo-item strong { font-size: 0.82rem; }
+.demo-item small { font-size: 0.65rem; color: var(--text-muted); }
+
+.demo-banner {
+  margin: 8px 20px 16px;
+  padding: 10px 16px;
+  background: #fff3cd;
+  color: #856404;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  text-align: center;
+  font-weight: 600;
+}
