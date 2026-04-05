@@ -7,7 +7,7 @@ const DEMO_MODE = true;
 const APP_VERSION = '5';
 
 // Gemini Vision API
-const GEMINI_API_KEY = 'AIzaSyClIAHrYJrgqiL0LmO32U7kjk8JQMSWNYs';
+const GEMINI_API_KEY = 'AIzaSyDsCxzuc1T31IsCkPq1wlz7YSxaLCmuqDs';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 let geminiAvailable = false;
 
