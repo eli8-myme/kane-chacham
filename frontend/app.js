@@ -1,17 +1,17 @@
 // ===== CONFIG =====
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
-  : 'https://your-backend.onrender.com'; // יתעדכן בהעלאה
+  : 'https://your-backend.onrender.com';
 
-// Demo mode: עובד בלי backend עם נתונים מקומיים
 const DEMO_MODE = true;
+const APP_VERSION = '5';
 
-// Gemini Vision API - זיהוי מוצרים מתמונה
+// Gemini Vision API
 const GEMINI_API_KEY = 'AIzaSyClIAHrYJrgqiL0LmO32U7kjk8JQMSWNYs';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+let geminiAvailable = false;
 
 // ===== DEMO DATABASE =====
-// מוצרים אמיתיים לדוגמה מסופרמרקטים ישראליים
 const DEMO_PRODUCTS = {
   "7290000066318": {
     product: { barcode: "7290000066318", name: "חלב תנובה 3%", brand: "תנובה", size: "1 ליטר", category: "חלב", image_url: "" },
@@ -45,23 +45,23 @@ const DEMO_PRODUCTS = {
     ]
   },
   "7290000563534": {
-    product: { barcode: "7290000563534", name: "שמן זית שמן הבית", brand: "שמן הבית", size: "750 מ\"ל", category: "שמנים", image_url: "" },
+    product: { barcode: "7290000563534", name: 'שמן זית שמן הבית', brand: "שמן הבית", size: '750 מ"ל', category: "שמנים", image_url: "" },
     comparisons: [
-      { store_name: "רמי לוי", store_chain: "rami_levy", price: 24.90, price_per_unit: 3.32, size: "750 מ\"ל", is_current: false },
-      { store_name: "שופרסל", store_chain: "shufersal", price: 29.90, price_per_unit: 3.99, size: "750 מ\"ל", is_current: true },
-      { store_name: "ויקטורי", store_chain: "victory", price: 26.90, price_per_unit: 3.59, size: "750 מ\"ל", is_current: false },
-      { store_name: "מגה", store_chain: "mega", price: 27.50, price_per_unit: 3.67, size: "750 מ\"ל", is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 24.90, price_per_unit: 3.32, size: '750 מ"ל', is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 29.90, price_per_unit: 3.99, size: '750 מ"ל', is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 26.90, price_per_unit: 3.59, size: '750 מ"ל', is_current: false },
+      { store_name: "מגה", store_chain: "mega", price: 27.50, price_per_unit: 3.67, size: '750 מ"ל', is_current: false },
     ]
   },
   "7290106809369": {
-    product: { barcode: "7290106809369", name: "אבקת כביסה סנו מקסימה", brand: "סנו", size: "2.5 ק\"ג", category: "ניקוי", image_url: "" },
+    product: { barcode: "7290106809369", name: "אבקת כביסה סנו מקסימה", brand: "סנו", size: '2.5 ק"ג', category: "ניקוי", image_url: "" },
     comparisons: [
-      { store_name: "רמי לוי", store_chain: "rami_levy", price: 34.90, price_per_unit: 1.40, size: "2.5 ק\"ג", is_current: false },
-      { store_name: "שופרסל", store_chain: "shufersal", price: 42.90, price_per_unit: 1.72, size: "2.5 ק\"ג", is_current: true },
-      { store_name: "ויקטורי", store_chain: "victory", price: 37.90, price_per_unit: 1.52, size: "2.5 ק\"ג", is_current: false },
-      { store_name: "אושר עד", store_chain: "osher_ad", price: 35.90, price_per_unit: 1.44, size: "2.5 ק\"ג", is_current: false },
-      { store_name: "רמי לוי", store_chain: "rami_levy", price: 54.90, price_per_unit: 1.10, size: "5 ק\"ג", is_current: false },
-      { store_name: "שופרסל", store_chain: "shufersal", price: 64.90, price_per_unit: 1.30, size: "5 ק\"ג", is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 34.90, price_per_unit: 1.40, size: '2.5 ק"ג', is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 42.90, price_per_unit: 1.72, size: '2.5 ק"ג', is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 37.90, price_per_unit: 1.52, size: '2.5 ק"ג', is_current: false },
+      { store_name: "אושר עד", store_chain: "osher_ad", price: 35.90, price_per_unit: 1.44, size: '2.5 ק"ג', is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 54.90, price_per_unit: 1.10, size: '5 ק"ג', is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 64.90, price_per_unit: 1.30, size: '5 ק"ג', is_current: false },
     ]
   },
   "7290000197067": {
@@ -74,37 +74,16 @@ const DEMO_PRODUCTS = {
     ]
   },
   "7290000100517": {
-    product: { barcode: "7290000100517", name: "סבון כלים פיירי", brand: "Fairy", size: "500 מ\"ל", category: "ניקוי", image_url: "" },
+    product: { barcode: "7290000100517", name: "סבון כלים פיירי", brand: "Fairy", size: '500 מ"ל', category: "ניקוי", image_url: "" },
     comparisons: [
-      { store_name: "רמי לוי", store_chain: "rami_levy", price: 9.90, price_per_unit: 1.98, size: "500 מ\"ל", is_current: false },
-      { store_name: "שופרסל", store_chain: "shufersal", price: 12.90, price_per_unit: 2.58, size: "500 מ\"ל", is_current: true },
-      { store_name: "ויקטורי", store_chain: "victory", price: 10.90, price_per_unit: 2.18, size: "500 מ\"ל", is_current: false },
+      { store_name: "רמי לוי", store_chain: "rami_levy", price: 9.90, price_per_unit: 1.98, size: '500 מ"ל', is_current: false },
+      { store_name: "שופרסל", store_chain: "shufersal", price: 12.90, price_per_unit: 2.58, size: '500 מ"ל', is_current: true },
+      { store_name: "ויקטורי", store_chain: "victory", price: 10.90, price_per_unit: 2.18, size: '500 מ"ל', is_current: false },
       { store_name: "שופרסל", store_chain: "shufersal", price: 19.90, price_per_unit: 1.99, size: "1 ליטר", is_current: false },
       { store_name: "רמי לוי", store_chain: "rami_levy", price: 16.90, price_per_unit: 1.69, size: "1 ליטר", is_current: false },
     ]
   },
 };
-
-// דמו דינמי: מייצר נתונים למוצרים שלא ב-DB
-function generateDemoForBarcode(barcode) {
-  const names = ["מוצר לדוגמה", "פריט סופרמרקט", "מוצר מזון", "מוצר ניקוי"];
-  const stores = ["שופרסל", "רמי לוי", "ויקטורי", "מגה", "יינות ביתן"];
-  const basePrice = 8 + Math.random() * 35;
-
-  const comparisons = stores.map((store, i) => ({
-    store_name: store,
-    store_chain: store,
-    price: Math.round((basePrice * (0.85 + Math.random() * 0.35)) * 100) / 100,
-    price_per_unit: Math.round((basePrice * (0.85 + Math.random() * 0.35) / 5) * 100) / 100,
-    size: "500 גרם",
-    is_current: i === 0,
-  }));
-
-  return {
-    product: { barcode, name: `מוצר ${barcode.slice(-4)}`, brand: "כללי", size: "500 גרם", category: "כללי", image_url: "" },
-    comparisons,
-  };
-}
 
 // ===== SCREEN MANAGER =====
 function showScreen(id) {
@@ -119,12 +98,20 @@ function goHome() {
   loadRecentScans();
 }
 
+function setStatus(msg, color) {
+  const el = document.getElementById('api-status');
+  el.style.display = 'block';
+  el.style.background = color === 'green' ? '#e8f5e9' : color === 'red' ? '#fce4ec' : '#fff3e0';
+  el.style.color = color === 'green' ? '#2e7d32' : color === 'red' ? '#c62828' : '#e65100';
+  el.textContent = msg;
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
 // ===== BARCODE SCANNER =====
 let scannerRunning = false;
 
 function startBarcodeScanner() {
   showScreen('scanner');
-
   const status = document.getElementById('scanner-status');
   status.textContent = 'מפעיל מצלמה...';
 
@@ -145,14 +132,11 @@ function startBarcodeScanner() {
     locate: true,
     numOfWorkers: 2,
     frequency: 10,
-    locator: {
-      patchSize: 'medium',
-      halfSample: true,
-    },
+    locator: { patchSize: 'medium', halfSample: true },
   }, (err) => {
     if (err) {
       status.textContent = 'שגיאה בגישה למצלמה. נסה ידנית.';
-      console.error(err);
+      console.error('Quagga init error:', err);
       return;
     }
     Quagga.start();
@@ -160,24 +144,20 @@ function startBarcodeScanner() {
     status.textContent = 'מחפש ברקוד... כוון את הברקוד למסגרת';
   });
 
-  // אימות ברקוד - דורש 3 קריאות זהות ברצף
   let detections = {};
   const REQUIRED_MATCHES = 3;
 
   Quagga.onDetected((result) => {
     const code = result.codeResult.code;
-    if (!code || code.length < 8) return; // ברקודים ישראליים 8-13 ספרות
+    if (!code || code.length < 8) return;
 
-    // ספור קריאות לכל ברקוד
     detections[code] = (detections[code] || 0) + 1;
-    console.log(`Barcode detected: ${code} (${detections[code]}/${REQUIRED_MATCHES})`);
-
-    document.getElementById('scanner-status').textContent = `מזהה: ${code} (${detections[code]}/${REQUIRED_MATCHES})`;
+    console.log(`Barcode: ${code} (${detections[code]}/${REQUIRED_MATCHES})`);
+    status.textContent = `מזהה: ${code} (${detections[code]}/${REQUIRED_MATCHES})`;
 
     if (detections[code] >= REQUIRED_MATCHES) {
-      // אומת! ברקוד נקרא 3 פעמים זהות
       if (navigator.vibrate) navigator.vibrate(200);
-      document.getElementById('scanner-status').textContent = `אומת: ${code}`;
+      status.textContent = `אומת: ${code}`;
       detections = {};
       stopScanner();
       searchProduct(code, 'barcode');
@@ -205,10 +185,9 @@ function startImageCapture() {
     video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
   }).then(stream => {
     cameraStream = stream;
-    const video = document.getElementById('camera-video');
-    video.srcObject = stream;
+    document.getElementById('camera-video').srcObject = stream;
   }).catch(err => {
-    console.error(err);
+    console.error('Camera error:', err);
     showError('לא ניתן לגשת למצלמה', err.message);
   });
 }
@@ -216,10 +195,9 @@ function startImageCapture() {
 function captureImage() {
   const video = document.getElementById('camera-video');
   const canvas = document.getElementById('camera-canvas');
-  canvas.width  = video.videoWidth;
+  canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-
   const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
   document.getElementById('captured-img').src = dataUrl;
   document.getElementById('captured-preview').style.display = 'flex';
@@ -258,46 +236,36 @@ async function searchProduct(data, type) {
   showScreen('loading');
   const steps = ['step-identify', 'step-prices', 'step-compare'];
   const loadingText = document.getElementById('loading-text');
-
-  // Reset steps
   steps.forEach(s => { document.getElementById(s).classList.remove('active', 'done'); });
 
   try {
-    // שלב 1: זיהוי
     document.getElementById(steps[0]).classList.add('active');
-    loadingText.textContent = type === 'image' ? 'שולח תמונה ל-AI לזיהוי...' : `מחפש ברקוד: ${data}`;
+    loadingText.textContent = type === 'image' ? 'שולח תמונה ל-AI...' : `מחפש ברקוד: ${data}`;
 
     let result;
-
     if (type === 'barcode') {
       result = await fetchPrices({ barcode: data });
     } else {
       const base64 = data.split(',')[1];
-      if (!base64) {
-        showError('שגיאה בתמונה', 'לא הצלחנו לעבד את התמונה. נסה לצלם שוב.');
-        return;
-      }
+      if (!base64) { showError('שגיאה בתמונה', 'נסה לצלם שוב.'); return; }
       result = await fetchPrices({ image_base64: base64 });
     }
 
-    // שלב 2: מחירים
     document.getElementById(steps[0]).classList.replace('active', 'done');
     document.getElementById(steps[1]).classList.add('active');
     loadingText.textContent = 'בודק מחירים...';
     await delay(300);
 
-    // שלב 3: השוואה
     document.getElementById(steps[1]).classList.replace('active', 'done');
     document.getElementById(steps[2]).classList.add('active');
     loadingText.textContent = 'מחשב השוואה...';
     await delay(300);
-
     document.getElementById(steps[2]).classList.replace('active', 'done');
 
     if (!result || !result.product) {
       const detail = type === 'image'
-        ? 'לא הצלחנו לזהות את המוצר מהתמונה. נסה לצלם מקרוב יותר, עם תאורה טובה.'
-        : `ברקוד ${data} לא נמצא במאגר.`;
+        ? 'לא הצלחנו לזהות את המוצר. נסה לצלם מקרוב, עם תאורה טובה.'
+        : `ברקוד ${data} לא נמצא.`;
       showError('המוצר לא נמצא', detail);
       return;
     }
@@ -307,32 +275,28 @@ async function searchProduct(data, type) {
 
   } catch (err) {
     console.error('Search error:', err);
-    showError('שגיאה', `${err.message || 'שגיאה לא צפויה'}`);
+    showError('שגיאה', err.message || 'שגיאה לא צפויה');
   }
 }
 
-// ===== API CALL =====
+// ===== FETCH PRICES =====
 async function fetchPrices(payload) {
-  // Demo mode: שימוש בנתונים מקומיים
-  if (DEMO_MODE) {
-    await delay(300); // סימולציה של חיפוש
-    return fetchDemoPrices(payload);
-  }
+  if (DEMO_MODE) return fetchDemoPrices(payload);
 
   const response = await fetch(`${API_BASE}/api/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-
   if (!response.ok) throw new Error(`Server error: ${response.status}`);
   return response.json();
 }
 
 async function fetchDemoPrices(payload) {
   if (payload.barcode) {
-    const data = DEMO_PRODUCTS[payload.barcode];
-    if (data) {
+    // 1. חפש ב-DB מקומי
+    if (DEMO_PRODUCTS[payload.barcode]) {
+      const data = DEMO_PRODUCTS[payload.barcode];
       return {
         product: data.product,
         current_store: "שופרסל",
@@ -340,66 +304,108 @@ async function fetchDemoPrices(payload) {
         comparisons: data.comparisons,
       };
     }
-    // ברקוד לא מוכר - צור דמו דינמי
-    const gen = generateDemoForBarcode(payload.barcode);
-    return {
-      product: gen.product,
-      current_store: gen.comparisons[0].store_name,
-      current_price: gen.comparisons[0].price,
-      comparisons: gen.comparisons,
-    };
-  }
 
-  if (payload.image_base64) {
-    // שלח ל-Gemini Vision לזיהוי אמיתי
-    const identified = await identifyWithGemini(payload.image_base64);
-
-    if (identified) {
-      // חפש ב-DB לפי ברקוד שזוהה
-      if (identified.barcode && DEMO_PRODUCTS[identified.barcode]) {
-        const data = DEMO_PRODUCTS[identified.barcode];
-        return {
-          product: data.product,
-          current_store: "שופרסל",
-          current_price: data.comparisons.find(c => c.is_current)?.price || data.comparisons[0].price,
-          comparisons: data.comparisons,
-        };
-      }
-
-      // חפש לפי שם מוצר ב-DB
-      const match = findProductByName(identified.name);
-      if (match) {
-        return {
-          product: { ...match.product, name: identified.name || match.product.name },
-          current_store: "שופרסל",
-          current_price: match.comparisons.find(c => c.is_current)?.price || match.comparisons[0].price,
-          comparisons: match.comparisons,
-        };
-      }
-
-      // מוצר זוהה אבל לא ב-DB - צור דמו עם הפרטים שזוהו
-      const gen = generateDemoForIdentified(identified);
+    // 2. חפש ב-Open Food Facts (מידע אמיתי על המוצר)
+    const offProduct = await lookupBarcode(payload.barcode);
+    if (offProduct) {
+      const gen = generateDemoComparisons(offProduct);
       return {
-        product: gen.product,
-        current_store: gen.comparisons[0].store_name,
-        current_price: gen.comparisons[0].price,
-        comparisons: gen.comparisons,
+        product: offProduct,
+        current_store: gen[0].store_name,
+        current_price: gen[0].price,
+        comparisons: gen,
       };
     }
 
-    // Gemini נכשל - fallback
+    // 3. Fallback - מוצר לא ידוע
     return null;
   }
 
+  if (payload.image_base64) {
+    const identified = await identifyWithGemini(payload.image_base64);
+    if (!identified) return null;
+
+    // חפש ב-DB
+    if (identified.barcode && DEMO_PRODUCTS[identified.barcode]) {
+      const data = DEMO_PRODUCTS[identified.barcode];
+      return {
+        product: data.product,
+        current_store: "שופרסל",
+        current_price: data.comparisons.find(c => c.is_current)?.price || data.comparisons[0].price,
+        comparisons: data.comparisons,
+      };
+    }
+
+    const match = findProductByName(identified.name);
+    if (match) {
+      return {
+        product: { ...match.product, name: identified.name || match.product.name },
+        current_store: "שופרסל",
+        current_price: match.comparisons.find(c => c.is_current)?.price || match.comparisons[0].price,
+        comparisons: match.comparisons,
+      };
+    }
+
+    // מוצר זוהה - צור השוואה עם הנתונים שזוהו
+    const product = {
+      barcode: identified.barcode || null,
+      name: identified.name || 'מוצר שזוהה',
+      brand: identified.brand || '',
+      size: identified.size || '',
+      category: identified.category || '',
+      image_url: '',
+    };
+    const gen = generateDemoComparisons(product);
+    return { product, current_store: gen[0].store_name, current_price: gen[0].price, comparisons: gen };
+  }
+
   return null;
+}
+
+// ===== OPEN FOOD FACTS API - חיפוש ברקוד חינמי =====
+async function lookupBarcode(barcode) {
+  try {
+    const loadingText = document.getElementById('loading-text');
+    loadingText.textContent = `מחפש מידע על ברקוד ${barcode}...`;
+
+    const resp = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await resp.json();
+
+    if (data.status !== 1) {
+      console.log('Open Food Facts: product not found for', barcode);
+      return null;
+    }
+
+    const p = data.product;
+    const product = {
+      barcode: barcode,
+      name: p.product_name_he || p.product_name || 'מוצר',
+      brand: p.brands || '',
+      size: p.quantity || '',
+      category: (p.categories_tags || [''])[0].replace('en:', ''),
+      image_url: p.image_front_small_url || p.image_front_url || '',
+    };
+
+    console.log('Open Food Facts found:', product.name);
+    loadingText.textContent = `נמצא: ${product.name}`;
+    return product;
+  } catch (err) {
+    console.error('Open Food Facts error:', err);
+    return null;
+  }
 }
 
 // ===== GEMINI VISION =====
 async function identifyWithGemini(base64Image) {
   const loadingText = document.getElementById('loading-text');
 
+  if (!geminiAvailable) {
+    loadingText.textContent = 'Gemini API לא זמין';
+    return null;
+  }
+
   try {
-    loadingText.textContent = 'שולח תמונה ל-Gemini AI...';
+    loadingText.textContent = 'שולח תמונה ל-AI לזיהוי...';
     console.log('Sending image to Gemini, size:', Math.round(base64Image.length / 1024) + 'KB');
 
     const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
@@ -423,32 +429,23 @@ If you cannot identify the product return: {"error":"cannot identify"}` },
     if (!response.ok) {
       const errBody = await response.text();
       console.error('Gemini API error:', response.status, errBody);
-      loadingText.textContent = `שגיאת API: ${response.status}`;
+      loadingText.textContent = `שגיאת Gemini: ${response.status}`;
       return null;
     }
 
     const data = await response.json();
-    console.log('Gemini raw response:', JSON.stringify(data).substring(0, 500));
-
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('Gemini raw:', text);
 
-    if (!text) {
-      console.error('Gemini returned empty response');
-      loadingText.textContent = 'Gemini לא החזיר תשובה';
-      return null;
-    }
+    if (!text) { loadingText.textContent = 'AI לא החזיר תשובה'; return null; }
 
-    // נקה JSON מ-markdown
     text = text.trim();
     if (text.startsWith('```')) {
       text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
     }
 
-    console.log('Gemini cleaned text:', text);
-
     const result = JSON.parse(text);
     if (result.error) {
-      console.warn('Gemini could not identify:', result.error);
       loadingText.textContent = 'AI לא הצליח לזהות את המוצר';
       return null;
     }
@@ -458,103 +455,74 @@ If you cannot identify the product return: {"error":"cannot identify"}` },
     return result;
 
   } catch (err) {
-    console.error('Gemini Vision error:', err);
-    loadingText.textContent = `שגיאה: ${err.message}`;
+    console.error('Gemini error:', err);
+    loadingText.textContent = `שגיאת זיהוי: ${err.message}`;
     return null;
   }
 }
 
-// חיפוש מוצר לפי שם ב-DEMO_PRODUCTS
+// ===== HELPERS =====
 function findProductByName(name) {
   if (!name) return null;
   const lower = name.toLowerCase();
-
   for (const key of Object.keys(DEMO_PRODUCTS)) {
     const p = DEMO_PRODUCTS[key].product;
-    if (lower.includes(p.name.toLowerCase()) ||
-        p.name.toLowerCase().includes(lower) ||
+    if (lower.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(lower) ||
         (p.brand && lower.includes(p.brand.toLowerCase()))) {
       return DEMO_PRODUCTS[key];
     }
   }
-
-  // חיפוש חלקי - מילים בודדות
   const words = lower.split(/\s+/).filter(w => w.length > 2);
   for (const key of Object.keys(DEMO_PRODUCTS)) {
     const p = DEMO_PRODUCTS[key].product;
-    const productText = `${p.name} ${p.brand} ${p.category}`.toLowerCase();
-    const matchCount = words.filter(w => productText.includes(w)).length;
-    if (matchCount >= 2 || (words.length === 1 && matchCount === 1)) {
-      return DEMO_PRODUCTS[key];
-    }
+    const txt = `${p.name} ${p.brand} ${p.category}`.toLowerCase();
+    if (words.filter(w => txt.includes(w)).length >= 2) return DEMO_PRODUCTS[key];
   }
-
   return null;
 }
 
-// דמו למוצר שזוהה ע"י Gemini אבל לא ב-DB
-function generateDemoForIdentified(identified) {
+function generateDemoComparisons(product) {
   const stores = ["שופרסל", "רמי לוי", "ויקטורי", "מגה", "יינות ביתן"];
-  const basePrice = identified.price ? parseFloat(identified.price) : (8 + Math.random() * 35);
-  const sizeVal = identified.size_value || 500;
-  const sizeUnit = identified.size_unit || 'g';
-  const sizeStr = identified.size || `${sizeVal} ${sizeUnit}`;
-
-  const comparisons = stores.map((store, i) => {
+  const basePrice = 8 + Math.random() * 35;
+  return stores.map((store, i) => {
     const price = Math.round((basePrice * (0.85 + Math.random() * 0.35)) * 100) / 100;
     return {
-      store_name: store,
-      store_chain: store,
-      price,
-      price_per_unit: Math.round((price / sizeVal * 100) * 100) / 100,
-      size: sizeStr,
-      is_current: i === 0,
+      store_name: store, store_chain: store, price,
+      price_per_unit: Math.round((price / 5) * 100) / 100,
+      size: product.size || "יחידה", is_current: i === 0,
     };
   });
-
-  return {
-    product: {
-      barcode: identified.barcode || null,
-      name: identified.name || 'מוצר שזוהה',
-      brand: identified.brand || '',
-      size: sizeStr,
-      category: identified.category || 'כללי',
-      image_url: '',
-    },
-    comparisons,
-  };
 }
 
 // ===== DISPLAY RESULTS =====
 function displayResults(data) {
   const { product, current_store, current_price, comparisons } = data;
 
-  // Product card
   document.getElementById('result-product-name').textContent = product.name;
   document.getElementById('result-product-brand').textContent = product.brand || '';
   document.getElementById('result-product-size').textContent = product.size || '';
 
+  const img = document.getElementById('result-product-img');
+  const placeholder = document.getElementById('product-img-placeholder');
   if (product.image_url) {
-    document.getElementById('result-product-img').src = product.image_url;
-    document.getElementById('result-product-img').style.display = '';
-    document.getElementById('product-img-placeholder').style.display = 'none';
+    img.src = product.image_url;
+    img.style.display = '';
+    placeholder.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    placeholder.style.display = '';
   }
 
-  // Current price
   document.getElementById('current-store').textContent = current_store || 'הסופר הנוכחי';
   document.getElementById('current-price').textContent = formatPrice(current_price);
 
-  // Sort comparisons by unit price
-  const sorted = [...comparisons].sort((a, b) => a.price_per_unit - b.price_per_unit);
+  const sorted = [...comparisons].sort((a, b) => (a.price_per_unit || a.price) - (b.price_per_unit || b.price));
   const best = sorted[0];
-  const current = comparisons.find(c => c.is_current) || { price: current_price };
 
-  // Best deal banner
   document.getElementById('deal-title').textContent = `${best.store_name} - ${best.size}`;
-  document.getElementById('deal-subtitle').textContent = `${formatPrice(best.price_per_unit)} ל-100 גרם/מ"ל`;
+  document.getElementById('deal-subtitle').textContent = best.price_per_unit ? `${formatPrice(best.price_per_unit)} ל-100 יח'` : '';
   document.getElementById('deal-price').textContent = formatPrice(best.price);
 
-  // Comparison table
   const table = document.getElementById('comparison-table');
   table.innerHTML = '';
 
@@ -562,19 +530,15 @@ function displayResults(data) {
     const isBest = index === 0;
     const isCurrent = item.is_current;
     const savings = current_price - item.price;
-
     const row = document.createElement('div');
     row.className = `comp-row ${isBest ? 'best' : ''} ${isCurrent ? 'current-row' : ''}`;
 
     let badge = '';
-    if (isBest && !isCurrent) badge = `<span class="comp-badge badge-best">הכי זול</span>`;
-    if (isCurrent) badge = `<span class="comp-badge badge-here">אתה כאן</span>`;
-    if (!isBest && !isCurrent && savings > 0) {
-      badge = `<span class="comp-badge badge-save">חסכון ${formatPrice(savings)}</span>`;
-    }
+    if (isBest && !isCurrent) badge = '<span class="comp-badge badge-best">הכי זול</span>';
+    if (isCurrent) badge = '<span class="comp-badge badge-here">אתה כאן</span>';
+    if (!isBest && !isCurrent && savings > 0) badge = `<span class="comp-badge badge-save">חסכון ${formatPrice(savings)}</span>`;
 
     const rankClass = index < 3 ? `rank-${index + 1}` : 'rank-other';
-
     row.innerHTML = `
       <div class="comp-rank ${rankClass}">${index + 1}</div>
       <div class="comp-store">
@@ -584,18 +548,16 @@ function displayResults(data) {
       </div>
       <div class="comp-price-wrap">
         <div class="comp-price">${formatPrice(item.price)}</div>
-        <div class="comp-per-unit">${formatPrice(item.price_per_unit)} ל-100 יח'</div>
+        <div class="comp-per-unit">${item.price_per_unit ? formatPrice(item.price_per_unit) + " ל-100 יח'" : ''}</div>
       </div>
     `;
     table.appendChild(row);
   });
 
-  // Savings
   const maxSavings = current_price - best.price;
   if (maxSavings > 0) {
     document.getElementById('savings-amount').textContent = formatPrice(maxSavings);
-    document.getElementById('savings-desc').textContent =
-      `לעומת ${best.store_name} (${best.size})`;
+    document.getElementById('savings-desc').textContent = `לעומת ${best.store_name}`;
     document.getElementById('savings-card').style.display = '';
   } else {
     document.getElementById('savings-card').style.display = 'none';
@@ -616,11 +578,9 @@ function loadRecentScans() {
   const recent = JSON.parse(localStorage.getItem('recent_scans') || '[]');
   const section = document.getElementById('recent-section');
   const list = document.getElementById('recent-list');
-
   if (recent.length === 0) { section.style.display = 'none'; return; }
   section.style.display = '';
   list.innerHTML = '';
-
   recent.forEach(item => {
     const el = document.createElement('div');
     el.className = 'recent-item';
@@ -631,9 +591,7 @@ function loadRecentScans() {
         <div style="font-size:0.75rem;color:#777">${timeAgo(item.ts)}</div>
       </div>
     `;
-    if (item.type === 'barcode' && item.data) {
-      el.onclick = () => searchProduct(item.data, 'barcode');
-    }
+    if (item.type === 'barcode' && item.data) el.onclick = () => searchProduct(item.data, 'barcode');
     list.appendChild(el);
   });
 }
@@ -651,9 +609,7 @@ function formatPrice(n) {
   return '₪' + parseFloat(n).toFixed(2);
 }
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 function timeAgo(ts) {
   const diff = Date.now() - ts;
@@ -665,39 +621,41 @@ function timeAgo(ts) {
   return `לפני ${Math.floor(hrs / 24)} ימים`;
 }
 
-// ===== TEST GEMINI API =====
+// ===== TEST & INIT =====
 async function testGeminiAPI() {
+  const banner = document.querySelector('.demo-banner');
   try {
     const resp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: 'Reply with just: OK' }] }],
+        contents: [{ parts: [{ text: 'Reply with: OK' }] }],
         generationConfig: { maxOutputTokens: 10 }
       })
     });
     const data = await resp.json();
     if (resp.ok) {
+      geminiAvailable = true;
       console.log('Gemini API: OK');
-      return true;
+      setStatus('Gemini AI מחובר - זיהוי תמונה זמין', 'green');
+      if (banner) banner.textContent = 'גרסת הדגמה - מחירים לדוגמה | AI מחובר';
     } else {
-      console.error('Gemini API error:', data.error?.message || resp.status);
-      const banner = document.querySelector('.demo-banner');
-      if (banner) banner.textContent = `שגיאת API: ${data.error?.message || resp.status}. זיהוי תמונה לא זמין.`;
-      return false;
+      const errMsg = data.error?.message || `status ${resp.status}`;
+      console.error('Gemini API error:', errMsg);
+      setStatus(`Gemini: ${errMsg}`, 'red');
+      if (banner) banner.textContent = `Gemini לא זמין: ${errMsg}. סריקת ברקוד עובדת.`;
     }
   } catch (e) {
-    console.error('Gemini API test failed:', e);
-    return false;
+    console.error('Gemini test failed:', e);
+    setStatus('Gemini לא זמין - סריקת ברקוד עובדת', 'orange');
+    if (banner) banner.textContent = 'גרסת הדגמה | AI לא זמין - סריקת ברקוד פעילה';
   }
 }
 
-// ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
+  console.log(`קנה חכם v${APP_VERSION} loaded`);
   loadRecentScans();
-  testGeminiAPI(); // בדיקת חיבור
-
-  // Enter key on manual input
+  testGeminiAPI();
   document.getElementById('manual-barcode').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') searchManual();
   });
