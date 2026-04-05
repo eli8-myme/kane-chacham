@@ -307,18 +307,21 @@ async function fetchDemoPrices(payload) {
 
     // 2. חפש ב-Open Food Facts (מידע אמיתי על המוצר)
     const offProduct = await lookupBarcode(payload.barcode);
-    if (offProduct) {
-      const gen = generateDemoComparisons(offProduct);
-      return {
-        product: offProduct,
-        current_store: gen[0].store_name,
-        current_price: gen[0].price,
-        comparisons: gen,
-      };
-    }
-
-    // 3. Fallback - מוצר לא ידוע
-    return null;
+    const product = offProduct || {
+      barcode: payload.barcode,
+      name: `מוצר (${payload.barcode})`,
+      brand: '',
+      size: '',
+      category: '',
+      image_url: '',
+    };
+    const gen = generateDemoComparisons(product);
+    return {
+      product,
+      current_store: gen[0].store_name,
+      current_price: gen[0].price,
+      comparisons: gen,
+    };
   }
 
   if (payload.image_base64) {
