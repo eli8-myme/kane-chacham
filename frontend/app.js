@@ -4,7 +4,7 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://your-backend.onrender.com';
 
 const DEMO_MODE = true;
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 
 // Gemini Vision API
 const GEMINI_API_KEY = 'AIzaSyDsCxzuc1T31IsCkPq1wlz7YSxaLCmuqDs';
@@ -110,10 +110,37 @@ function setStatus(msg, color) {
 // ===== BARCODE SCANNER =====
 let scannerRunning = false;
 
+// גלובלי - מונע handlers כפולים
+let barcodeDetections = {};
+const REQUIRED_MATCHES = 3;
+
+function onBarcodeDetected(result) {
+  const code = result.codeResult.code;
+  if (!code || code.length < 8) return;
+
+  barcodeDetections[code] = (barcodeDetections[code] || 0) + 1;
+  console.log(`Barcode: ${code} (${barcodeDetections[code]}/${REQUIRED_MATCHES})`);
+
+  const status = document.getElementById('scanner-status');
+  status.textContent = `מזהה: ${code} (${barcodeDetections[code]}/${REQUIRED_MATCHES})`;
+
+  if (barcodeDetections[code] >= REQUIRED_MATCHES) {
+    if (navigator.vibrate) navigator.vibrate(200);
+    status.textContent = `אומת: ${code}`;
+    barcodeDetections = {};
+    stopScanner();
+    searchProduct(code, 'barcode');
+  }
+}
+
 function startBarcodeScanner() {
   showScreen('scanner');
   const status = document.getElementById('scanner-status');
   status.textContent = 'מפעיל מצלמה...';
+  barcodeDetections = {};
+
+  // הסר handlers ישנים לפני הוספת חדש
+  Quagga.offDetected(onBarcodeDetected);
 
   Quagga.init({
     inputStream: {
@@ -144,25 +171,7 @@ function startBarcodeScanner() {
     status.textContent = 'מחפש ברקוד... כוון את הברקוד למסגרת';
   });
 
-  let detections = {};
-  const REQUIRED_MATCHES = 3;
-
-  Quagga.onDetected((result) => {
-    const code = result.codeResult.code;
-    if (!code || code.length < 8) return;
-
-    detections[code] = (detections[code] || 0) + 1;
-    console.log(`Barcode: ${code} (${detections[code]}/${REQUIRED_MATCHES})`);
-    status.textContent = `מזהה: ${code} (${detections[code]}/${REQUIRED_MATCHES})`;
-
-    if (detections[code] >= REQUIRED_MATCHES) {
-      if (navigator.vibrate) navigator.vibrate(200);
-      status.textContent = `אומת: ${code}`;
-      detections = {};
-      stopScanner();
-      searchProduct(code, 'barcode');
-    }
-  });
+  Quagga.onDetected(onBarcodeDetected);
 }
 
 function stopScanner() {
@@ -264,8 +273,8 @@ async function searchProduct(data, type) {
 
     if (!result || !result.product) {
       const detail = type === 'image'
-        ? 'זיהוי תמונה לא זמין כרגע. נסה לסרוק את הברקוד במקום, או הכנס ברקוד ידנית.'
-        : `ברקוד ${data} לא נמצא במאגרים.`;
+        ? 'לא הצלחנו לזהות את המוצר בתמונה. נסה לסרוק את הברקוד במקום, או הכנס ברקוד ידנית.'
+        : `ברקוד ${data} לא נמצא במאגרים. נסה לצלם את המוצר או הכנס ברקוד אחר.`;
       showError('המוצר לא נמצא', detail);
       return;
     }
@@ -326,7 +335,20 @@ async function fetchDemoPrices(payload) {
 
   if (payload.image_base64) {
     const identified = await identifyWithGemini(payload.image_base64);
-    if (!identified) return null;
+
+    if (!identified) {
+      // Gemini לא זמין או לא זיהה - החזר מוצר גנרי במקום שגיאה
+      const product = {
+        barcode: null,
+        name: 'מוצר שצולם (לא זוהה)',
+        brand: '',
+        size: '',
+        category: '',
+        image_url: '',
+      };
+      const gen = generateDemoComparisons(product);
+      return { product, current_store: gen[0].store_name, current_price: gen[0].price, comparisons: gen };
+    }
 
     // חפש ב-DB
     if (identified.barcode && DEMO_PRODUCTS[identified.barcode]) {
@@ -402,8 +424,12 @@ async function lookupBarcode(barcode) {
 async function identifyWithGemini(base64Image) {
   const loadingText = document.getElementById('loading-text');
 
+  if (!GEMINI_API_KEY) {
+    loadingText.textContent = 'מפתח Gemini לא מוגדר - זיהוי תמונה לא זמין';
+    return null;
+  }
   if (!geminiAvailable) {
-    loadingText.textContent = 'Gemini API לא זמין';
+    loadingText.textContent = 'Gemini API לא זמין כרגע - נסה סריקת ברקוד';
     return null;
   }
 
