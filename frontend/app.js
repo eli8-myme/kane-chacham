@@ -8,7 +8,7 @@ const DEMO_MODE = true;
 
 // Gemini Vision API - זיהוי מוצרים מתמונה
 const GEMINI_API_KEY = 'AIzaSyClIAHrYJrgqiL0LmO32U7kjk8JQMSWNYs';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // ===== DEMO DATABASE =====
 // מוצרים אמיתיים לדוגמה מסופרמרקטים ישראליים
@@ -139,11 +139,16 @@ function startBarcodeScanner() {
       },
     },
     decoder: {
-      readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'code_128_reader'],
+      readers: ['ean_reader', 'ean_8_reader'],
+      multiple: false,
     },
     locate: true,
     numOfWorkers: 2,
     frequency: 10,
+    locator: {
+      patchSize: 'medium',
+      halfSample: true,
+    },
   }, (err) => {
     if (err) {
       status.textContent = 'שגיאה בגישה למצלמה. נסה ידנית.';
@@ -152,26 +157,31 @@ function startBarcodeScanner() {
     }
     Quagga.start();
     scannerRunning = true;
-    status.textContent = 'מחפש ברקוד...';
+    status.textContent = 'מחפש ברקוד... כוון את הברקוד למסגרת';
   });
 
-  let lastCode = null;
-  let lastTime = 0;
+  // אימות ברקוד - דורש 3 קריאות זהות ברצף
+  let detections = {};
+  const REQUIRED_MATCHES = 3;
 
   Quagga.onDetected((result) => {
     const code = result.codeResult.code;
-    const now = Date.now();
-    // debounce: אותו ברקוד לפחות 2 שניות פרידה
-    if (code === lastCode && now - lastTime < 2000) return;
-    lastCode = code;
-    lastTime = now;
+    if (!code || code.length < 8) return; // ברקודים ישראליים 8-13 ספרות
 
-    // ויברציה אם נתמכת
-    if (navigator.vibrate) navigator.vibrate(100);
+    // ספור קריאות לכל ברקוד
+    detections[code] = (detections[code] || 0) + 1;
+    console.log(`Barcode detected: ${code} (${detections[code]}/${REQUIRED_MATCHES})`);
 
-    document.getElementById('scanner-status').textContent = `זוהה: ${code}`;
-    stopScanner();
-    searchProduct(code, 'barcode');
+    document.getElementById('scanner-status').textContent = `מזהה: ${code} (${detections[code]}/${REQUIRED_MATCHES})`;
+
+    if (detections[code] >= REQUIRED_MATCHES) {
+      // אומת! ברקוד נקרא 3 פעמים זהות
+      if (navigator.vibrate) navigator.vibrate(200);
+      document.getElementById('scanner-status').textContent = `אומת: ${code}`;
+      detections = {};
+      stopScanner();
+      searchProduct(code, 'barcode');
+    }
   });
 }
 
@@ -655,9 +665,37 @@ function timeAgo(ts) {
   return `לפני ${Math.floor(hrs / 24)} ימים`;
 }
 
+// ===== TEST GEMINI API =====
+async function testGeminiAPI() {
+  try {
+    const resp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: 'Reply with just: OK' }] }],
+        generationConfig: { maxOutputTokens: 10 }
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      console.log('Gemini API: OK');
+      return true;
+    } else {
+      console.error('Gemini API error:', data.error?.message || resp.status);
+      const banner = document.querySelector('.demo-banner');
+      if (banner) banner.textContent = `שגיאת API: ${data.error?.message || resp.status}. זיהוי תמונה לא זמין.`;
+      return false;
+    }
+  } catch (e) {
+    console.error('Gemini API test failed:', e);
+    return false;
+  }
+}
+
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
   loadRecentScans();
+  testGeminiAPI(); // בדיקת חיבור
 
   // Enter key on manual input
   document.getElementById('manual-barcode').addEventListener('keydown', (e) => {
