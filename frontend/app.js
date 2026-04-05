@@ -103,7 +103,7 @@ function setStatus(msg, color) {
   el.style.display = 'block';
   el.style.background = color === 'green' ? '#e8f5e9' : color === 'red' ? '#fce4ec' : '#fff3e0';
   el.style.color = color === 'green' ? '#2e7d32' : color === 'red' ? '#c62828' : '#e65100';
-  el.textContent = msg;
+  el.textContent = msg.substring(0, 100); // חסום הודעות ארוכות
   setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 
@@ -264,8 +264,8 @@ async function searchProduct(data, type) {
 
     if (!result || !result.product) {
       const detail = type === 'image'
-        ? 'לא הצלחנו לזהות את המוצר. נסה לצלם מקרוב, עם תאורה טובה.'
-        : `ברקוד ${data} לא נמצא.`;
+        ? 'זיהוי תמונה לא זמין כרגע. נסה לסרוק את הברקוד במקום, או הכנס ברקוד ידנית.'
+        : `ברקוד ${data} לא נמצא במאגרים.`;
       showError('המוצר לא נמצא', detail);
       return;
     }
@@ -427,9 +427,15 @@ If you cannot identify the product return: {"error":"cannot identify"}` },
     });
 
     if (!response.ok) {
-      const errBody = await response.text();
-      console.error('Gemini API error:', response.status, errBody);
-      loadingText.textContent = `שגיאת Gemini: ${response.status}`;
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData.error?.message || `status ${response.status}`;
+      console.error('Gemini API error:', errMsg);
+      if (errMsg.includes('quota') || errMsg.includes('Quota')) {
+        geminiAvailable = false;
+        loadingText.textContent = 'מכסת AI חינמית נגמרה. נסה סריקת ברקוד.';
+      } else {
+        loadingText.textContent = 'שגיאת זיהוי תמונה';
+      }
       return null;
     }
 
@@ -624,32 +630,10 @@ function timeAgo(ts) {
 // ===== TEST & INIT =====
 async function testGeminiAPI() {
   const banner = document.querySelector('.demo-banner');
-  try {
-    const resp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: 'Reply with: OK' }] }],
-        generationConfig: { maxOutputTokens: 10 }
-      })
-    });
-    const data = await resp.json();
-    if (resp.ok) {
-      geminiAvailable = true;
-      console.log('Gemini API: OK');
-      setStatus('Gemini AI מחובר - זיהוי תמונה זמין', 'green');
-      if (banner) banner.textContent = 'גרסת הדגמה - מחירים לדוגמה | AI מחובר';
-    } else {
-      const errMsg = data.error?.message || `status ${resp.status}`;
-      console.error('Gemini API error:', errMsg);
-      setStatus(`Gemini: ${errMsg}`, 'red');
-      if (banner) banner.textContent = `Gemini לא זמין: ${errMsg}. סריקת ברקוד עובדת.`;
-    }
-  } catch (e) {
-    console.error('Gemini test failed:', e);
-    setStatus('Gemini לא זמין - סריקת ברקוד עובדת', 'orange');
-    if (banner) banner.textContent = 'גרסת הדגמה | AI לא זמין - סריקת ברקוד פעילה';
-  }
+  // לא מבזבזים quota על טסט - רק בודקים בפעם הראשונה שמשתמשים
+  geminiAvailable = !!GEMINI_API_KEY;
+  if (banner) banner.textContent = 'גרסת הדגמה - סרוק ברקוד או צלם מוצר';
+  console.log('Gemini key present:', geminiAvailable);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
