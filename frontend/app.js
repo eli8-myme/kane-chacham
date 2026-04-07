@@ -4,12 +4,12 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://your-backend.onrender.com';
 
 const DEMO_MODE = true;
-const APP_VERSION = '6';
+const APP_VERSION = '7';
 
 // Gemini Vision API
 const GEMINI_API_KEY = 'AIzaSyDsCxzuc1T31IsCkPq1wlz7YSxaLCmuqDs';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-let geminiAvailable = false;
+let geminiAvailable = !!GEMINI_API_KEY; // זמין מיד אם יש מפתח, ייחסם רק אחרי שגיאה אמיתית
 
 // ===== DEMO DATABASE =====
 const DEMO_PRODUCTS = {
@@ -111,23 +111,50 @@ function setStatus(msg, color) {
 let scannerRunning = false;
 
 // גלובלי - מונע handlers כפולים
-let barcodeDetections = {};
+let lastDetectedCode = null;
+let detectionHits = 0;
 const REQUIRED_MATCHES = 3;
 
+// בדיקת checksum של EAN-13
+function validateEAN13(code) {
+  if (!/^\d{13}$/.test(code)) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return check === parseInt(code[12]);
+}
+
 function onBarcodeDetected(result) {
-  const code = result.codeResult.code;
-  if (!code || code.length < 8) return;
+  const code = result?.codeResult?.code;
+  const format = result?.codeResult?.format;
 
-  barcodeDetections[code] = (barcodeDetections[code] || 0) + 1;
-  console.log(`Barcode: ${code} (${barcodeDetections[code]}/${REQUIRED_MATCHES})`);
+  // סנן רק EAN-13 תקינים עם checksum
+  if (!code) return;
+  if (format !== 'ean_13' && !/^\d{13}$/.test(code)) return;
+  if (!validateEAN13(code)) {
+    console.log(`Barcode rejected (bad checksum): ${code}`);
+    return;
+  }
 
+  // דרוש אותו קוד 3 פעמים רצופות
+  if (code === lastDetectedCode) {
+    detectionHits += 1;
+  } else {
+    lastDetectedCode = code;
+    detectionHits = 1;
+  }
+
+  console.log(`Barcode: ${code} (${detectionHits}/${REQUIRED_MATCHES})`);
   const status = document.getElementById('scanner-status');
-  status.textContent = `מזהה: ${code} (${barcodeDetections[code]}/${REQUIRED_MATCHES})`;
+  status.textContent = `מזהה: ${code} (${detectionHits}/${REQUIRED_MATCHES})`;
 
-  if (barcodeDetections[code] >= REQUIRED_MATCHES) {
+  if (detectionHits >= REQUIRED_MATCHES) {
     if (navigator.vibrate) navigator.vibrate(200);
     status.textContent = `אומת: ${code}`;
-    barcodeDetections = {};
+    lastDetectedCode = null;
+    detectionHits = 0;
     stopScanner();
     searchProduct(code, 'barcode');
   }
@@ -137,7 +164,8 @@ function startBarcodeScanner() {
   showScreen('scanner');
   const status = document.getElementById('scanner-status');
   status.textContent = 'מפעיל מצלמה...';
-  barcodeDetections = {};
+  lastDetectedCode = null;
+  detectionHits = 0;
 
   // הסר handlers ישנים לפני הוספת חדש
   Quagga.offDetected(onBarcodeDetected);
@@ -151,15 +179,25 @@ function startBarcodeScanner() {
         width: { ideal: 1280 },
         height: { ideal: 720 },
       },
+      // צמצום אזור סריקה - מתמקד במרכז המסגרת
+      area: {
+        top: '25%',
+        right: '10%',
+        left: '10%',
+        bottom: '25%',
+      },
     },
     decoder: {
-      readers: ['ean_reader', 'ean_8_reader'],
+      readers: ['ean_reader'],  // רק EAN-13, בלי readers מיותרים
       multiple: false,
     },
     locate: true,
-    numOfWorkers: 2,
+    numOfWorkers: navigator.hardwareConcurrency || 4,
     frequency: 10,
-    locator: { patchSize: 'medium', halfSample: true },
+    locator: {
+      patchSize: 'small',       // קטן יותר = מדויק יותר לברקודים קטנים
+      halfSample: true,
+    },
   }, (err) => {
     if (err) {
       status.textContent = 'שגיאה בגישה למצלמה. נסה ידנית.';
