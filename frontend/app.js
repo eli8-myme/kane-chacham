@@ -4,7 +4,7 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://your-backend.onrender.com';
 
 const DEMO_MODE = true;
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 
 // Gemini Vision API
 const GEMINI_API_KEY = 'AIzaSyDsCxzuc1T31IsCkPq1wlz7YSxaLCmuqDs';
@@ -555,14 +555,39 @@ function findProductByName(name) {
 }
 
 function generateDemoComparisons(product) {
-  const stores = ["שופרסל", "רמי לוי", "ויקטורי", "מגה", "יינות ביתן"];
-  const basePrice = 8 + Math.random() * 35;
+  // רשתות סופרמרקט ישראליות מלאות עם תמחור יחסי ריאליסטי
+  const stores = [
+    { name: "רמי לוי", chain: "rami_levy", factor: 0.88 },      // הכי זול בדרך כלל
+    { name: "אושר עד", chain: "osher_ad", factor: 0.90 },
+    { name: "יינות ביתן", chain: "yeinot_bitan", factor: 0.95 },
+    { name: "ויקטורי", chain: "victory", factor: 0.96 },
+    { name: "מגה", chain: "mega", factor: 0.98 },
+    { name: "שופרסל דיל", chain: "shufersal_deal", factor: 0.93 },
+    { name: "שופרסל", chain: "shufersal", factor: 1.00 },        // בסיס ההשוואה
+    { name: "טיב טעם", chain: "tiv_taam", factor: 1.02 },
+    { name: "חצי חינם", chain: "hatzi_hinam", factor: 0.92 },
+  ];
+
+  // מחיר בסיס ריאליסטי לפי קטגוריה
+  const categoryPrices = {
+    'חלב': 6.5, 'מוצרי חלב': 7, 'חטיפים': 5.5, 'שמנים': 28,
+    'ניקוי': 15, 'קפה': 22, 'לחם': 8, 'שתייה': 7, 'ירקות': 5,
+    'בשר': 45, 'דגים': 35, 'פירות': 8, 'ממתקים': 10, 'תבלינים': 8,
+  };
+  const basePrice = categoryPrices[product.category] || 12;
+
+  // שונות קטנה אקראית (±5%) כדי שהמחיר לא יהיה זהה
   return stores.map((store, i) => {
-    const price = Math.round((basePrice * (0.85 + Math.random() * 0.35)) * 100) / 100;
+    const jitter = 1 + (Math.random() - 0.5) * 0.10; // ±5%
+    const price = Math.round(basePrice * store.factor * jitter * 100) / 100;
+    const sizeVal = parseFloat(product.size) || 1;
     return {
-      store_name: store, store_chain: store, price,
-      price_per_unit: Math.round((price / 5) * 100) / 100,
-      size: product.size || "יחידה", is_current: i === 0,
+      store_name: store.name,
+      store_chain: store.chain,
+      price,
+      price_per_unit: Math.round((price / sizeVal) * 100) / 100,
+      size: product.size || "יחידה",
+      is_current: store.chain === 'shufersal', // שופרסל כברירת מחדל "אתה כאן"
     };
   });
 }
