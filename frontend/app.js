@@ -4,7 +4,7 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://your-backend.onrender.com';
 
 const DEMO_MODE = true;
-const APP_VERSION = '9';
+const APP_VERSION = '10';
 
 // ===== DEMO DATABASE =====
 const DEMO_PRODUCTS = {
@@ -128,13 +128,10 @@ function setStatus(msg, color) {
   setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 
-// ===== BARCODE SCANNER =====
+// ===== BARCODE SCANNER (html5-qrcode) =====
+let html5QrCode = null;
 let scannerRunning = false;
-let lastDetectedCode = null;
-let detectionHits = 0;
-const REQUIRED_MATCHES = 3;
 
-// בדיקת checksum של EAN-13
 function validateEAN13(code) {
   if (!/^\d{13}$/.test(code)) return false;
   let sum = 0;
@@ -145,91 +142,70 @@ function validateEAN13(code) {
   return check === parseInt(code[12]);
 }
 
-function onBarcodeDetected(result) {
-  const code = result?.codeResult?.code;
-  const format = result?.codeResult?.format;
+function onScanSuccess(decodedText) {
+  if (!decodedText || decodedText.length < 8) return;
 
-  if (!code) return;
-  if (format !== 'ean_13' && !/^\d{13}$/.test(code)) return;
-  if (!validateEAN13(code)) {
-    console.log(`Barcode rejected (bad checksum): ${code}`);
+  // בדיקת EAN-13
+  if (decodedText.length === 13 && !validateEAN13(decodedText)) {
+    console.log(`Barcode rejected (bad checksum): ${decodedText}`);
     return;
   }
 
-  if (code === lastDetectedCode) {
-    detectionHits += 1;
-  } else {
-    lastDetectedCode = code;
-    detectionHits = 1;
-  }
+  console.log(`Barcode found: ${decodedText}`);
+  if (navigator.vibrate) navigator.vibrate(200);
 
-  console.log(`Barcode: ${code} (${detectionHits}/${REQUIRED_MATCHES})`);
   const status = document.getElementById('scanner-status');
-  status.textContent = `מזהה: ${code} (${detectionHits}/${REQUIRED_MATCHES})`;
+  status.textContent = `נמצא: ${decodedText}`;
 
-  if (detectionHits >= REQUIRED_MATCHES) {
-    if (navigator.vibrate) navigator.vibrate(200);
-    status.textContent = `נמצא: ${code}`;
-    lastDetectedCode = null;
-    detectionHits = 0;
-    stopScanner();
-    searchProduct(code);
-  }
+  stopScanner();
+  searchProduct(decodedText);
 }
 
-function startBarcodeScanner() {
+async function startBarcodeScanner() {
   showScreen('scanner');
   const status = document.getElementById('scanner-status');
   status.textContent = 'מפעיל מצלמה...';
-  lastDetectedCode = null;
-  detectionHits = 0;
 
-  Quagga.offDetected(onBarcodeDetected);
+  // נקה סורק קודם אם קיים
+  await stopScanner();
 
-  Quagga.init({
-    inputStream: {
-      type: 'LiveStream',
-      target: document.getElementById('interactive'),
-      constraints: {
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+  try {
+    html5QrCode = new Html5Qrcode('interactive');
+
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: { width: 280, height: 150 },
+        aspectRatio: 1.777,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+        ],
       },
-      area: {
-        top: '25%',
-        right: '10%',
-        left: '10%',
-        bottom: '25%',
-      },
-    },
-    decoder: {
-      readers: ['ean_reader'],
-      multiple: false,
-    },
-    locate: true,
-    numOfWorkers: navigator.hardwareConcurrency || 4,
-    frequency: 10,
-    locator: {
-      patchSize: 'small',
-      halfSample: true,
-    },
-  }, (err) => {
-    if (err) {
-      status.textContent = 'שגיאה בגישה למצלמה. נסה ידנית.';
-      console.error('Quagga init error:', err);
-      return;
-    }
-    Quagga.start();
+      onScanSuccess,
+      (errorMessage) => {
+        // שגיאות סריקה שקטות - זה נורמלי כשאין ברקוד בפריים
+      }
+    );
+
     scannerRunning = true;
     status.textContent = 'כוון את הברקוד למסגרת';
-  });
 
-  Quagga.onDetected(onBarcodeDetected);
+  } catch (err) {
+    console.error('Scanner error:', err);
+    status.textContent = 'שגיאה בגישה למצלמה. נסה ידנית.';
+  }
 }
 
-function stopScanner() {
-  if (scannerRunning) {
-    Quagga.stop();
+async function stopScanner() {
+  if (html5QrCode && scannerRunning) {
+    try {
+      await html5QrCode.stop();
+    } catch (e) {
+      // ignore
+    }
     scannerRunning = false;
   }
 }

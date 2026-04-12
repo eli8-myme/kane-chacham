@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>קנה חכם - השוואת מחירים</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -84,19 +84,7 @@
       <button class="back-btn" onclick="goHome()">&#8594; חזרה</button>
       <h2>סרוק ברקוד</h2>
     </div>
-    <div class="scanner-container">
-      <div id="interactive" class="viewport"></div>
-      <div class="scanner-overlay">
-        <div class="scanner-frame">
-          <div class="corner tl"></div>
-          <div class="corner tr"></div>
-          <div class="corner bl"></div>
-          <div class="corner br"></div>
-          <div class="scan-line"></div>
-        </div>
-        <p class="scanner-hint">מקם את הברקוד בתוך המסגרת</p>
-      </div>
-    </div>
+    <div id="interactive" style="width:100%;max-width:500px;margin:0 auto;"></div>
     <div class="scanner-status" id="scanner-status">מחפש ברקוד...</div>
   </div>
 
@@ -190,7 +178,7 @@
   <div id="api-status" style="display:none;position:fixed;bottom:0;left:0;right:0;padding:8px 16px;font-size:0.75rem;text-align:center;z-index:999;font-family:monospace;"></div>
 
   <!-- Scripts -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-  <script src="app.js?v=9"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
