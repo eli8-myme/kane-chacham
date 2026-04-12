@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>קנה חכם - השוואת מחירים</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -19,7 +19,7 @@
         <span class="logo-icon">🛒</span>
         <span class="logo-text">קנה חכם</span>
       </div>
-      <p class="logo-sub">סרוק מוצר וקבל את המחיר הכי טוב</p>
+      <p class="logo-sub">סרוק ברקוד וקבל את המחיר הכי טוב</p>
     </div>
 
     <div class="home-actions">
@@ -27,12 +27,6 @@
         <span class="btn-icon">📷</span>
         <span class="btn-label">סרוק ברקוד</span>
         <span class="btn-sub">מהיר ומדויק</span>
-      </button>
-
-      <button class="action-btn secondary" onclick="startImageCapture()">
-        <span class="btn-icon">🔍</span>
-        <span class="btn-label">צלם מוצר</span>
-        <span class="btn-sub">זיהוי חכם ע"י AI</span>
       </button>
 
       <div class="divider"><span>או</span></div>
@@ -47,27 +41,27 @@
     <div class="demo-section" id="demo-section">
       <h3>נסה עכשיו - מוצרים לדוגמה</h3>
       <div class="demo-list">
-        <div class="demo-item" onclick="searchProduct('7290000066318','barcode')">
+        <div class="demo-item" onclick="searchProduct('7290000066318')">
           <span class="demo-emoji">🥛</span>
           <div><strong>חלב תנובה 3%</strong><br><small>7290000066318</small></div>
         </div>
-        <div class="demo-item" onclick="searchProduct('7290000307268','barcode')">
+        <div class="demo-item" onclick="searchProduct('7290000307268')">
           <span class="demo-emoji">🥜</span>
           <div><strong>במבה אסם</strong><br><small>7290000307268</small></div>
         </div>
-        <div class="demo-item" onclick="searchProduct('7290000197067','barcode')">
+        <div class="demo-item" onclick="searchProduct('7290000197067')">
           <span class="demo-emoji">☕</span>
           <div><strong>קפה עלית נמס</strong><br><small>7290000197067</small></div>
         </div>
-        <div class="demo-item" onclick="searchProduct('7290106809369','barcode')">
+        <div class="demo-item" onclick="searchProduct('7290106809369')">
           <span class="demo-emoji">🧺</span>
           <div><strong>אבקת כביסה סנו</strong><br><small>7290106809369</small></div>
         </div>
-        <div class="demo-item" onclick="searchProduct('7290000563534','barcode')">
+        <div class="demo-item" onclick="searchProduct('7290000563534')">
           <span class="demo-emoji">🫒</span>
           <div><strong>שמן זית</strong><br><small>7290000563534</small></div>
         </div>
-        <div class="demo-item" onclick="searchProduct('7290000100517','barcode')">
+        <div class="demo-item" onclick="searchProduct('7290000100517')">
           <span class="demo-emoji">🧴</span>
           <div><strong>סבון כלים פיירי</strong><br><small>7290000100517</small></div>
         </div>
@@ -104,30 +98,6 @@
       </div>
     </div>
     <div class="scanner-status" id="scanner-status">מחפש ברקוד...</div>
-  </div>
-
-  <!-- ===== SCREEN: IMAGE CAPTURE ===== -->
-  <div id="screen-image" class="screen">
-    <div class="scanner-header">
-      <button class="back-btn" onclick="goHome()">&#8594; חזרה</button>
-      <h2>צלם מוצר</h2>
-    </div>
-    <div class="camera-container">
-      <video id="camera-video" autoplay playsinline></video>
-      <canvas id="camera-canvas" style="display:none"></canvas>
-    </div>
-    <div class="camera-controls">
-      <button class="capture-btn" onclick="captureImage()">
-        <span>📸</span> צלם
-      </button>
-    </div>
-    <div id="captured-preview" style="display:none">
-      <img id="captured-img" src="" alt="תמונה שצולמה">
-      <div class="preview-actions">
-        <button class="btn-confirm" onclick="analyzeImage()">נתח תמונה</button>
-        <button class="btn-retake" onclick="retakePhoto()">צלם שוב</button>
-      </div>
-    </div>
   </div>
 
   <!-- ===== SCREEN: LOADING ===== -->
@@ -221,6 +191,6 @@
 
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
