@@ -148,5 +148,29 @@ async def fetch_from_open_food_facts(barcode: str):
         return None
 
 
+@app.post("/api/import")
+async def trigger_import():
+    """
+    הפעלת יבוא מחירים מקבצי XML - קורא ל-xml_importer
+    """
+    import threading
+    from xml_importer import run_full_import
+
+    def run_in_background():
+        try:
+            total = run_full_import()
+            logger.info(f"Import finished: {total} prices")
+        except Exception as e:
+            logger.error(f"Import failed: {e}")
+
+    thread = threading.Thread(target=run_in_background, daemon=True)
+    thread.start()
+
+    return {
+        "status": "started",
+        "message": "יבוא מחירים החל ברקע. בדוק /health לראות כמה מוצרים נטענו."
+    }
+
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

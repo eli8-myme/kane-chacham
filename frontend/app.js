@@ -1,7 +1,7 @@
 // ===== CONFIG =====
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
-  : 'https://kane-chacham-api.onrender.com';
+  : 'https://kane-chacham.onrender.com';
 
 const DEMO_MODE = false;  // false = use real backend, true = use local demo data
 const APP_VERSION = '11';
