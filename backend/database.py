@@ -99,8 +99,8 @@ class Database:
             rows = conn.execute("""
                 SELECT * FROM prices
                 WHERE barcode = ?
-                  AND updated_at >= datetime('now', '-1 day')
-                ORDER BY price_per_unit ASC
+                  AND updated_at >= datetime('now', '-7 days')
+                ORDER BY price ASC
             """, (barcode,)).fetchall()
             return [dict(r) for r in rows]
 

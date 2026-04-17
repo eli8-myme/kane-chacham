@@ -1,135 +1,278 @@
 """
-xml_importer.py - יבוא יומי של קבצי XML מחירים
-הרץ כ-cron job יומי: python xml_importer.py
+xml_importer.py - יבוא יומי של מחירי סופרמרקט מקבצי XML רשמיים
+הרץ יומית: python xml_importer.py
 
-מקורות (חוק שקיפות מחירים):
-- שופרסל: https://prices.shufersal.co.il
-- רמי לוי: https://url.rami-levy.co.il
-- ויקטורי: https://matrixcatalog.co.il
-- מגה: https://publishprice.mega.co.il
+משתמש בחבילת il-supermarket-scraper להורדת הקבצים
+ומפרסר את ה-XML לתוך SQLite
 """
-import asyncio
-import httpx
+import os
+import sys
 import gzip
 import xml.etree.ElementTree as ET
 import logging
-import os
+import glob
+import shutil
 from datetime import datetime
 from database import db
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+# תיקיית הורדות
+DUMP_DIR = os.path.join(os.path.dirname(__file__), "dumps")
 
-# URLs לקבצי המחירים הרשמיים
-PRICE_SOURCES = [
-    {
-        "chain": "shufersal",
-        "name": "שופרסל",
-        "index_url": "https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=5&storeId=0",
-    },
-    {
-        "chain": "rami_levy",
-        "name": "רמי לוי",
-        "index_url": "https://url.rami-levy.co.il/api/catalog/",
-    },
+# הרשתות שנרצה לייבא (שם ב-enum של il-supermarket-scraper)
+ENABLED_CHAINS = [
+    "SHUFERSAL",
+    "RAMI_LEVY",
+    "VICTORY",
+    "YAYNO_BITAN_AND_CARREFOUR",
+    "OSHER_AD",
+    "HAZI_HINAM",
+    "TIV_TAAM",
 ]
 
+# מיפוי שמות רשתות לעברית
+CHAIN_NAMES = {
+    "SHUFERSAL": "שופרסל",
+    "RAMI_LEVY": "רמי לוי",
+    "VICTORY": "ויקטורי",
+    "YAYNO_BITAN_AND_CARREFOUR": "יינות ביתן",
+    "OSHER_AD": "אושר עד",
+    "HAZI_HINAM": "חצי חינם",
+    "TIV_TAAM": "טיב טעם",
+}
 
-async def download_and_parse_xml(url: str, chain: str, store_name: str) -> list:
-    """מוריד קובץ XML (או gz) ומפרסר מחירים"""
-    prices = []
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+def download_price_files():
+    """הורדת קבצי PriceFull מכל הרשתות"""
+    try:
+        from il_supermarket_scarper import ScarpingTask
+        from il_supermarket_scarper.scrappers_factory import ScraperFactory
+        from il_supermarket_scarper.utils.file_types import FileTypesFilters
+    except ImportError:
+        logger.error("il-supermarket-scraper not installed. Run: pip install il-supermarket-scraper")
+        sys.exit(1)
+
+    os.makedirs(DUMP_DIR, exist_ok=True)
+
+    logger.info(f"Downloading PriceFull files for {len(ENABLED_CHAINS)} chains...")
+
+    for chain_name in ENABLED_CHAINS:
         try:
-            resp = await client.get(url, follow_redirects=True)
-            content = resp.content
+            chain_enum = ScraperFactory[chain_name]
+            logger.info(f"Downloading: {chain_name} ({CHAIN_NAMES.get(chain_name, chain_name)})")
 
-            # אם gz - פתח
-            if url.endswith(".gz") or content[:2] == b'\x1f\x8b':
-                content = gzip.decompress(content)
-
-            root = ET.fromstring(content)
-
-            # מבנה XML שופרסל/רמי לוי
-            for item in root.iter("Item"):
-                try:
-                    barcode = (
-                        item.findtext("ItemCode") or
-                        item.findtext("Barcode") or ""
-                    ).strip()
-                    if not barcode:
-                        continue
-
-                    price_str = item.findtext("ItemPrice") or item.findtext("Price") or "0"
-                    price = float(price_str.replace(",", "."))
-                    if price <= 0:
-                        continue
-
-                    name = item.findtext("ItemName") or item.findtext("Name") or ""
-                    size_raw = item.findtext("UnitQty") or item.findtext("Quantity") or ""
-                    unit = item.findtext("UnitOfMeasure") or "g"
-                    branch_id = root.findtext("StoreId") or root.findtext("BranchNumber") or "0"
-
-                    size_val = float(size_raw) if size_raw else None
-                    price_per_unit = round(price / size_val * 100, 4) if size_val and size_val > 0 else price
-
-                    prices.append({
-                        "barcode": barcode,
-                        "store_name": store_name,
-                        "store_chain": chain,
-                        "branch_id": branch_id,
-                        "price": price,
-                        "price_per_unit": price_per_unit,
-                        "size": f"{size_raw} {unit}".strip() if size_raw else "",
-                        "size_value": size_val,
-                        "size_unit": unit,
-                        "updated_at": datetime.utcnow().isoformat(),
-                    })
-
-                    # שמור גם מוצר אם לא קיים
-                    if name:
-                        try:
-                            existing = db.get_product_by_barcode(barcode)
-                            if not existing:
-                                db.save_product({
-                                    "barcode": barcode,
-                                    "name": name,
-                                    "size": f"{size_raw} {unit}".strip(),
-                                })
-                        except Exception:
-                            pass
-
-                except (ValueError, AttributeError):
-                    continue
+            scraper = ScarpingTask(
+                enabled_scrapers=[chain_enum],
+                files_types=[FileTypesFilters.PRICE_FULL_FILE],
+                dump_folder=DUMP_DIR,
+                limit=1,  # רק הקובץ האחרון (העדכני ביותר)
+            )
+            scraper.start()
+            logger.info(f"Downloaded: {chain_name}")
 
         except Exception as e:
-            logger.error(f"Error processing {url}: {e}")
+            logger.error(f"Error downloading {chain_name}: {e}")
+            continue
 
-    return prices
+
+def parse_xml_file(filepath: str, chain_key: str) -> tuple:
+    """פרסור קובץ XML יחיד, מחזיר (products, prices)"""
+    products = []
+    prices = []
+    store_name = CHAIN_NAMES.get(chain_key, chain_key)
+
+    try:
+        # פתח קובץ (gz או XML רגיל)
+        if filepath.endswith(".gz"):
+            with gzip.open(filepath, "rb") as f:
+                content = f.read()
+        else:
+            with open(filepath, "rb") as f:
+                content = f.read()
+
+        root = ET.fromstring(content)
+
+        # מצא StoreId/BranchNumber
+        branch_id = (
+            root.findtext("StoreId")
+            or root.findtext("BranchId")
+            or root.findtext(".//StoreId")
+            or root.findtext(".//BranchId")
+            or "0"
+        ).strip()
+
+        for item in root.iter("Item"):
+            try:
+                barcode = (
+                    item.findtext("ItemCode")
+                    or item.findtext("Barcode")
+                    or ""
+                ).strip()
+                if not barcode or len(barcode) < 7:
+                    continue
+
+                price_str = (
+                    item.findtext("ItemPrice")
+                    or item.findtext("Price")
+                    or "0"
+                )
+                price = float(price_str.replace(",", "."))
+                if price <= 0:
+                    continue
+
+                name = (
+                    item.findtext("ItemName")
+                    or item.findtext("Name")
+                    or ""
+                ).strip()
+
+                size_raw = item.findtext("UnitQty") or item.findtext("Quantity") or ""
+                unit = (
+                    item.findtext("UnitOfMeasure")
+                    or item.findtext("UnitMeasure")
+                    or ""
+                ).strip()
+
+                size_val = None
+                try:
+                    size_val = float(size_raw) if size_raw else None
+                except ValueError:
+                    pass
+
+                # חישוב מחיר ליחידה
+                price_per_unit = price
+                if size_val and size_val > 0:
+                    # נרמול: אם ק"ג -> גרם, אם ליטר -> מ"ל
+                    normalized = size_val
+                    if unit.lower() in ("kg", "ק\"ג", "קג"):
+                        normalized = size_val * 1000
+                    elif unit.lower() in ("l", "ליטר", "ל"):
+                        normalized = size_val * 1000
+                    price_per_unit = round(price / normalized * 100, 4) if normalized > 0 else price
+
+                size_str = f"{size_raw} {unit}".strip() if size_raw else ""
+
+                prices.append({
+                    "barcode": barcode,
+                    "store_name": store_name,
+                    "store_chain": chain_key.lower(),
+                    "branch_id": branch_id,
+                    "price": price,
+                    "price_per_unit": price_per_unit,
+                    "size": size_str,
+                    "size_value": size_val,
+                    "size_unit": unit,
+                    "updated_at": datetime.utcnow().isoformat(),
+                })
+
+                # שמור גם מוצר
+                if name:
+                    products.append({
+                        "barcode": barcode,
+                        "name": name,
+                        "brand": item.findtext("ManufacturerName") or "",
+                        "size": size_str,
+                        "category": "",
+                        "image_url": "",
+                    })
+
+            except (ValueError, AttributeError):
+                continue
+
+    except ET.ParseError as e:
+        logger.error(f"XML parse error in {filepath}: {e}")
+    except Exception as e:
+        logger.error(f"Error processing {filepath}: {e}")
+
+    return products, prices
 
 
-async def run_import():
-    """הרץ יבוא מלא"""
-    logger.info(f"Starting XML import at {datetime.now()}")
-    total = 0
+def import_downloaded_files():
+    """מייבא את כל הקבצים שהורדו ל-DB"""
+    if not os.path.exists(DUMP_DIR):
+        logger.warning("No dump directory found. Run download first.")
+        return 0
 
-    # כאן יש להוסיף את ה-URLs הספציפיים של הקבצים
-    # כל רשת מפרסמת אינדקס - צריך קודם לשלוף ממנו את הקבצים
-    # לדוגמה פשוטה - URL ישיר:
-    test_urls = [
-        # ("https://prices.shufersal.co.il/...", "shufersal", "שופרסל"),
-    ]
+    total_prices = 0
+    total_products = 0
 
-    for url, chain, name in test_urls:
-        prices = await download_and_parse_xml(url, chain, name)
-        if prices:
-            db.bulk_import_prices(prices)
-            total += len(prices)
-            logger.info(f"Imported {len(prices)} prices from {name}")
+    for chain_key in ENABLED_CHAINS:
+        chain_lower = chain_key.lower()
+        # חפש קבצי pricefull שהורדו
+        pattern = os.path.join(DUMP_DIR, "**", "*")
+        all_files = glob.glob(pattern, recursive=True)
 
-    logger.info(f"Import complete. Total: {total} prices")
+        price_files = [
+            f for f in all_files
+            if os.path.isfile(f)
+            and "pricefull" in os.path.basename(f).lower()
+            and (f.endswith(".xml") or f.endswith(".gz"))
+        ]
+
+        if not price_files:
+            # נסה גם בלי "full"
+            price_files = [
+                f for f in all_files
+                if os.path.isfile(f)
+                and "price" in os.path.basename(f).lower()
+                and "promo" not in os.path.basename(f).lower()
+                and (f.endswith(".xml") or f.endswith(".gz"))
+            ]
+
+        logger.info(f"{CHAIN_NAMES.get(chain_key, chain_key)}: found {len(price_files)} price files")
+
+        for filepath in price_files:
+            products, prices = parse_xml_file(filepath, chain_key)
+
+            if products:
+                for prod in products:
+                    try:
+                        existing = db.get_product_by_barcode(prod["barcode"])
+                        if not existing:
+                            db.save_product(prod)
+                            total_products += 1
+                    except Exception:
+                        pass
+
+            if prices:
+                try:
+                    db.bulk_import_prices(prices)
+                    total_prices += len(prices)
+                    logger.info(f"  Imported {len(prices)} prices from {os.path.basename(filepath)}")
+                except Exception as e:
+                    logger.error(f"  Error importing prices: {e}")
+
+    return total_prices
+
+
+def cleanup_dumps():
+    """ניקוי קבצים שהורדו"""
+    if os.path.exists(DUMP_DIR):
+        shutil.rmtree(DUMP_DIR)
+        logger.info("Cleaned up dump directory")
+
+
+def run_full_import():
+    """הרצת תהליך מלא: הורדה -> יבוא -> ניקוי"""
+    start = datetime.now()
+    logger.info(f"=== Starting full import at {start} ===")
+
+    # שלב 1: הורדה
+    download_price_files()
+
+    # שלב 2: יבוא
+    total = import_downloaded_files()
+
+    # שלב 3: ניקוי
+    cleanup_dumps()
+
+    elapsed = (datetime.now() - start).total_seconds()
+    logger.info(f"=== Import complete: {total} prices in {elapsed:.0f}s ===")
+
+    return total
 
 
 if __name__ == "__main__":
-    asyncio.run(run_import())
+    run_full_import()

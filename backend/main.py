@@ -7,17 +7,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
-import base64
 import logging
+import httpx
 
 from database import db
-from gemini_vision import identify_product_from_image
 from price_fetcher import get_comparisons
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="קנה חכם API", version="1.0.0")
+app = FastAPI(title="קנה חכם API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,99 +28,103 @@ app.add_middleware(
 
 class SearchRequest(BaseModel):
     barcode: Optional[str] = None
-    image_base64: Optional[str] = None
-    store_name: Optional[str] = None   # הסופר שהלקוח נמצא בו (אופציונלי)
-    store_price: Optional[float] = None  # המחיר שהלקוח ראה (אופציונלי)
+    store_name: Optional[str] = None
+    store_price: Optional[float] = None
 
 
 @app.get("/")
 def root():
-    return {"status": "ok", "app": "קנה חכם"}
+    return {"status": "ok", "app": "קנה חכם", "version": "2.0"}
 
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "db_products": db.count_products()}
+    count = db.count_products()
+    return {"status": "healthy", "db_products": count}
+
+
+@app.get("/api/prices/{barcode}")
+async def get_prices_by_barcode(barcode: str):
+    """
+    חיפוש מחירים לפי ברקוד - endpoint פשוט
+    מחזיר מידע על המוצר + מחירים מכל הרשתות
+    """
+    product = db.get_product_by_barcode(barcode)
+
+    if not product:
+        product = await fetch_from_open_food_facts(barcode)
+        if product:
+            db.save_product(product)
+
+    if not product:
+        raise HTTPException(status_code=404, detail="המוצר לא נמצא במאגר")
+
+    comparisons = await get_comparisons(barcode=barcode)
+
+    if not comparisons:
+        raise HTTPException(status_code=404, detail="לא נמצאו מחירים להשוואה")
+
+    sorted_comps = sorted(comparisons, key=lambda x: x.get("price", 999))
+    best = sorted_comps[0] if sorted_comps else None
+
+    return {
+        "product": product,
+        "current_store": sorted_comps[-1]["store_name"] if sorted_comps else "",
+        "current_price": sorted_comps[-1]["price"] if sorted_comps else 0,
+        "comparisons": sorted_comps,
+    }
 
 
 @app.post("/api/search")
 async def search(req: SearchRequest):
     """
-    מקבל ברקוד או תמונה, מחזיר מוצר + השוואת מחירים
+    מקבל ברקוד, מחזיר מוצר + השוואת מחירים
     """
+    if not req.barcode:
+        raise HTTPException(status_code=400, detail="נדרש ברקוד")
+
     barcode = req.barcode
-    product_name = None
+    logger.info(f"Searching by barcode: {barcode}")
 
-    # --- שלב 1: זיהוי מוצר ---
-    if barcode:
-        logger.info(f"Searching by barcode: {barcode}")
-        product = db.get_product_by_barcode(barcode)
-
-        if not product:
-            # ניסיון Open Food Facts (חינם)
-            product = await fetch_from_open_food_facts(barcode)
-            if product:
-                db.save_product(product)
-
-    elif req.image_base64:
-        logger.info("Searching by image (Gemini Vision)")
-        result = await identify_product_from_image(req.image_base64)
-
-        if not result:
-            raise HTTPException(status_code=404, detail="לא הצלחנו לזהות את המוצר מהתמונה")
-
-        barcode = result.get("barcode")
-        product_name = result.get("name")
-        product = db.get_product_by_barcode(barcode) if barcode else None
-
-        if not product and product_name:
-            product = db.search_product_by_name(product_name)
-
-    else:
-        raise HTTPException(status_code=400, detail="נדרש ברקוד או תמונה")
+    product = db.get_product_by_barcode(barcode)
+    if not product:
+        product = await fetch_from_open_food_facts(barcode)
+        if product:
+            db.save_product(product)
 
     if not product:
         raise HTTPException(status_code=404, detail="המוצר לא נמצא במאגר")
 
-    # --- שלב 2: השוואת מחירים ---
-    comparisons = await get_comparisons(
-        barcode=product.get("barcode"),
-        product_name=product.get("name"),
-        category=product.get("category"),
-    )
+    comparisons = await get_comparisons(barcode=barcode)
 
     if not comparisons:
         raise HTTPException(status_code=404, detail="לא נמצאו מחירים להשוואה")
 
-    # --- שלב 3: סימון 'המחיר הנוכחי' ---
     current_price = req.store_price
     current_store = req.store_name
 
-    # אם לא נשלח מחיר, נשתמש בממוצע כברירת מחדל
-    if not current_price and comparisons:
-        avg = sum(c["price"] for c in comparisons) / len(comparisons)
-        current_price = avg
-
-    # סמן את הרשומה הכי קרובה כ"נוכחית"
     if current_store:
         for c in comparisons:
             if current_store.lower() in c["store_name"].lower():
                 c["is_current"] = True
     elif comparisons:
-        # ברירת מחדל: הרשומה הראשונה
-        comparisons[0]["is_current"] = True
+        comparisons[-1]["is_current"] = True
+
+    if not current_price and comparisons:
+        current_price = comparisons[-1]["price"]
+    if not current_store and comparisons:
+        current_store = comparisons[-1]["store_name"]
 
     return {
         "product": product,
-        "current_store": current_store or comparisons[0]["store_name"],
-        "current_price": current_price or comparisons[0]["price"],
+        "current_store": current_store,
+        "current_price": current_price,
         "comparisons": comparisons,
     }
 
 
 async def fetch_from_open_food_facts(barcode: str):
     """שליפה חינמית מ-Open Food Facts"""
-    import httpx
     try:
         url = f"https://world.openfoodfacts.org/api/v0/product/{barcode}.json"
         async with httpx.AsyncClient(timeout=5.0) as client:

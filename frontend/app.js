@@ -1,10 +1,10 @@
 // ===== CONFIG =====
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
-  : 'https://your-backend.onrender.com';
+  : 'https://kane-chacham-api.onrender.com';
 
-const DEMO_MODE = true;
-const APP_VERSION = '10';
+const DEMO_MODE = false;  // false = use real backend, true = use local demo data
+const APP_VERSION = '11';
 
 // ===== DEMO DATABASE =====
 const DEMO_PRODUCTS = {
@@ -259,13 +259,24 @@ async function searchProduct(barcode) {
 async function fetchPrices(barcode) {
   if (DEMO_MODE) return fetchDemoPrices(barcode);
 
-  const response = await fetch(`${API_BASE}/api/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ barcode }),
-  });
-  if (!response.ok) throw new Error(`Server error: ${response.status}`);
-  return response.json();
+  // נסה backend אמיתי, אם נכשל - fallback לדמו
+  try {
+    const response = await fetch(`${API_BASE}/api/prices/${barcode}`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.comparisons && data.comparisons.length > 0) {
+        console.log(`Backend returned ${data.comparisons.length} prices`);
+        return data;
+      }
+    }
+    console.log(`Backend returned no results, falling back to demo`);
+  } catch (err) {
+    console.warn('Backend unavailable, using demo data:', err.message);
+  }
+
+  return fetchDemoPrices(barcode);
 }
 
 async function fetchDemoPrices(barcode) {
