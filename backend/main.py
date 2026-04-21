@@ -11,7 +11,6 @@ import logging
 import httpx
 
 from database import db
-from database import Base, engine
 from price_fetcher import get_comparisons
 
 logging.basicConfig(level=logging.INFO)
@@ -24,11 +23,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-)@app.on_event("startup")
-async def startup_event():
-    """יצירת טבלאות בהפעלה ראשונה"""
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created/verified")
+)
 
 
 class SearchRequest(BaseModel):
