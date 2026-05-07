@@ -5,6 +5,9 @@ Shufersal Scraper - הורדת מחירים משופרסל
 - אין צורך ב-login (חוק שקיפות מחירים מ-2014)
 - עדכונים יומיומיים ב-2:00 בלילה
 - כל סניף מקבל קובץ XML.GZ נפרד
+
+הערה חשובה: שופרסל קוראים לקבצי PriceFull בשם Price (בלי Full),
+למרות שהם בעצם הקבצים המלאים. הסינון נעשה דרך ?cat=2 ב-URL.
 """
 import logging
 import re
@@ -52,7 +55,8 @@ class ShufersalScraper(BaseChainScraper):
         מחזיר רשימת קבצי PriceFull לסניפים.
         
         ה-URL של שופרסל מסונן לפי קטגוריה ב-`?cat=`:
-        - cat=2 = PricesFull (הקובץ המלא של מחירים)
+        - cat=2 = PricesFull (הקובץ המלא של מחירים) 
+          [שופרסל קוראים לקבצים האלה Price בשמות, אבל הם המלאים]
         - cat=0 = Prices (רק עדכונים)
         """
         files = []
@@ -98,18 +102,22 @@ class ShufersalScraper(BaseChainScraper):
     
     def _parse_html_for_files(self, html: str) -> List[Dict[str, str]]:
         """
-        חילוץ קישורי PriceFull מתוך HTML של עמוד שופרסל.
+        חילוץ קישורי Price מתוך HTML של עמוד שופרסל.
+        
+        חשוב: שופרסל קוראים לקבצי PriceFull בשם "Price" (בלי Full).
+        כשגלשנו עם ?cat=2 - מקבלים רק קבצי Price המלאים.
         """
         files = []
         
-        # Regex למציאת שורות table - כל שורה מכילה url של PriceFull + שם סניף
-        link_pattern = r'href="(https://[^"]*PriceFull[^"]+\.gz[^"]*)"'
+        # Regex למציאת קישורים של Price (לא PriceFull!)
+        # התבנית: pricesprodpublic.blob.core.windows.net/price/PriceXXXX.gz
+        link_pattern = r'href="(https://pricesprodpublic\.blob\.core\.windows\.net/price/Price[^"]+\.gz[^"]*)"'
         
         # פיצול ל-rows של table
         rows = re.split(r'<tr[^>]*>', html)
         
         for row in rows:
-            # האם יש בשורה הזו קישור PriceFull?
+            # האם יש בשורה הזו קישור Price?
             link_match = re.search(link_pattern, row)
             if not link_match:
                 continue
@@ -136,17 +144,19 @@ class ShufersalScraper(BaseChainScraper):
         """
         חילוץ branch_id מה-URL.
         
-        דוגמאות:
-        - PriceFull7290027600007-001-202605070200.gz → "001"
-        - PriceFull7290027600007-001-357-20260507-024000.gz → "357"
-        - PriceFull7290027600007-002-413-20260507-024000.gz → "413"
+        דוגמאות (השמות האמיתיים בשופרסל - ללא 'Full'):
+        - Price7290027600007-001-202605070200.gz → "001"
+        - Price7290027600007-001-357-20260507-024000.gz → "357"
+        - Price7290027600007-002-413-20260507-024000.gz → "413"
         """
-        match = re.search(r'PriceFull\d+-(\d+)(?:-(\d+))?', url)
+        # שינוי: חיפוש Price (לא PriceFull) - שיתאים גם ל-Price וגם ל-PriceFull
+        match = re.search(r'/Price(?:Full)?(\d+)-(\d+)(?:-(\d+))?', url)
         if not match:
             return ""
         
-        first = match.group(1)
-        second = match.group(2)
+        # match.group(1) = chain_id (13 ספרות)
+        first = match.group(2)   # מספר ראשון אחרי chain_id
+        second = match.group(3)  # מספר שני (אופציונלי)
         
         # אם יש שני מספרים והשני אינו תאריך - השני הוא branch_id
         if second and len(second) <= 4:
