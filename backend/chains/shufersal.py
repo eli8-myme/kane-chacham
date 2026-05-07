@@ -122,7 +122,9 @@ class ShufersalScraper(BaseChainScraper):
             if not link_match:
                 continue
             
-            url = link_match.group(1)
+           url = link_match.group(1)
+            # פענוח HTML entities (&amp; → &)
+            url = url.replace("&amp;", "&")
             
             # חילוץ branch_id מה-URL
             branch_id = self._extract_branch_id(url)
