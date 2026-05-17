@@ -2,18 +2,37 @@
 Chains package - מודולי הורדת XML מרשתות שיווק שונות
 
 כל רשת מקבלת קובץ נפרד שיורש מ-BaseChainScraper.
-כשנוסיף רשתות חדשות (publishedprices, mega, וכו') - פשוט נוסיף קובץ פה.
 """
 from .base import BaseChainScraper
 from .shufersal import ShufersalScraper
+from .published_prices import (
+    RamiLevyScraper,
+    HaziHinamScraper,
+    VictoryScraper,
+    YohananofScraper,
+    OsherAdScraper,
+    TivTaamScraper,
+)
 
 # רשימת כל ה-scrapers הזמינים
 AVAILABLE_SCRAPERS = [
     ShufersalScraper,
-    # בעתיד נוסיף:
-    # PublishedPricesScraper,  # רמי לוי, ויקטורי, יוחננוף, חצי חינם...
-    # MegaScraper,
-    # BitanScraper,
+    RamiLevyScraper,
+    HaziHinamScraper,
+    VictoryScraper,
+    YohananofScraper,
+    OsherAdScraper,
+    TivTaamScraper,
 ]
 
-__all__ = ["BaseChainScraper", "ShufersalScraper", "AVAILABLE_SCRAPERS"]
+__all__ = [
+    "BaseChainScraper",
+    "ShufersalScraper",
+    "RamiLevyScraper",
+    "HaziHinamScraper",
+    "VictoryScraper",
+    "YohananofScraper",
+    "OsherAdScraper",
+    "TivTaamScraper",
+    "AVAILABLE_SCRAPERS",
+]

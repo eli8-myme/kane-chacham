@@ -165,7 +165,7 @@ class Database:
     def get_prices(self, barcode: str) -> List[Dict]:
         session = self._get_session()
         try:
-            cutoff = (datetime.utcnow() - timedelta(days=1)).isoformat()
+            cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
             prices = session.query(Price).filter(
                 Price.barcode == barcode,
                 Price.updated_at >= cutoff
