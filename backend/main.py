@@ -2,10 +2,11 @@
 קנה חכם - Backend API
 FastAPI server for product price comparison
 """
-from fastapi import FastAPI, HTTPException
+import os
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import uvicorn
 import logging
 import httpx
@@ -197,6 +198,45 @@ def get_stats():
     finally:
         if session:
             session.close()
+
+
+UPLOAD_SECRET = os.getenv("UPLOAD_SECRET", "kane-chacham-2024")
+
+
+class UploadData(BaseModel):
+    products: List[dict] = []
+    prices: List[dict] = []
+
+
+@app.post("/api/upload-prices")
+async def upload_prices(data: UploadData, x_secret: Optional[str] = Header(None)):
+    """
+    קבלת נתוני מחירים מסקריפט מקומי (מהמחשב בישראל)
+    """
+    if x_secret != UPLOAD_SECRET:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    products_saved = 0
+    for p in data.products:
+        try:
+            db.save_product(p)
+            products_saved += 1
+        except Exception:
+            pass
+
+    prices_saved = 0
+    if data.prices:
+        try:
+            db.bulk_import_prices(data.prices)
+            prices_saved = len(data.prices)
+        except Exception as e:
+            logger.error(f"Error saving prices: {e}")
+
+    return {
+        "status": "ok",
+        "products_saved": products_saved,
+        "prices_saved": prices_saved,
+    }
 
 
 if __name__ == "__main__":
