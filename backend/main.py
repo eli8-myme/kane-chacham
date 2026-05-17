@@ -149,7 +149,7 @@ async def fetch_from_open_food_facts(barcode: str):
 
 
 @app.post("/api/import")
-async def trigger_import():
+async def trigger_import(branches: int = 10):
     """
     הפעלת יבוא מחירים מקבצי XML - קורא ל-xml_importer
     """
@@ -158,7 +158,7 @@ async def trigger_import():
 
     def run_in_background():
         try:
-            total = run_full_import()
+            total = run_full_import(max_branches_per_chain=branches)
             logger.info(f"Import finished: {total} prices")
         except Exception as e:
             logger.error(f"Import failed: {e}")
@@ -168,8 +168,35 @@ async def trigger_import():
 
     return {
         "status": "started",
+        "branches_per_chain": branches,
+        "chains": len(AVAILABLE_SCRAPERS) if 'AVAILABLE_SCRAPERS' in dir() else 7,
         "message": "יבוא מחירים החל ברקע. בדוק /health לראות כמה מוצרים נטענו."
     }
+
+
+@app.get("/api/stats")
+def get_stats():
+    """סטטיסטיקות DB - כמה מוצרים ומחירים יש"""
+    session = None
+    try:
+        from database import SessionLocal, Product, Price
+        session = SessionLocal()
+        products_count = session.query(Product).count()
+        prices_count = session.query(Price).count()
+        # ספור רשתות ייחודיות
+        chains = session.query(Price.store_chain).distinct().all()
+        chain_names = [c[0] for c in chains if c[0]]
+        return {
+            "products": products_count,
+            "prices": prices_count,
+            "chains": chain_names,
+            "chains_count": len(chain_names),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        if session:
+            session.close()
 
 
 if __name__ == "__main__":
