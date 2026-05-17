@@ -32,17 +32,7 @@ class ShufersalScraper(BaseChainScraper):
         "Accept-Language": "he,en;q=0.9",
     }
 
-    DEFAULT_BRANCH_IDS = [
-        "001",
-        "002",
-        "004",
-        "035",
-        "413",
-    ]
-
-    def __init__(self, branch_ids=None, max_branches=5):
-        if branch_ids is None:
-            branch_ids = self.DEFAULT_BRANCH_IDS
+    def __init__(self, branch_ids=None, max_branches=20):
         super().__init__(branch_ids=branch_ids, max_branches=max_branches)
 
     def get_store_files(self) -> List[Dict[str, str]]:

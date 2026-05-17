@@ -4,7 +4,7 @@ const API_BASE = window.location.hostname === 'localhost'
   : 'https://kane-chacham.onrender.com';
 
 const DEMO_MODE = false;  // false = use real backend, true = use local demo data
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 
 // ===== DEMO DATABASE =====
 const DEMO_PRODUCTS = {
@@ -242,7 +242,7 @@ async function searchProduct(barcode) {
     document.getElementById(steps[2]).classList.replace('active', 'done');
 
     if (!result || !result.product) {
-      showError('המוצר לא נמצא', `ברקוד ${barcode} לא נמצא במאגרים. נסה ברקוד אחר.`);
+      showError('לא נמצאו מחירים', `ברקוד ${barcode} לא נמצא במאגר המחירים שלנו. כרגע יש מחירים משופרסל בלבד.`);
       return;
     }
 
@@ -259,7 +259,7 @@ async function searchProduct(barcode) {
 async function fetchPrices(barcode) {
   if (DEMO_MODE) return fetchDemoPrices(barcode);
 
-  // נסה backend אמיתי, אם נכשל - fallback לדמו
+  // נסה backend אמיתי
   try {
     const response = await fetch(`${API_BASE}/api/prices/${barcode}`, {
       headers: { 'Accept': 'application/json' },
@@ -271,12 +271,17 @@ async function fetchPrices(barcode) {
         return data;
       }
     }
-    console.log(`Backend returned no results, falling back to demo`);
+    // אם אין מחירים ב-backend - נחפש לפחות את שם המוצר
+    const offProduct = await lookupBarcode(barcode);
+    if (offProduct) {
+      return null; // יגרום להצגת הודעת "לא נמצאו מחירים" עם שם המוצר
+    }
+    console.log(`No real prices found for ${barcode}`);
   } catch (err) {
-    console.warn('Backend unavailable, using demo data:', err.message);
+    console.warn('Backend unavailable:', err.message);
   }
 
-  return fetchDemoPrices(barcode);
+  return null; // null = אין מחירים אמיתיים
 }
 
 async function fetchDemoPrices(barcode) {
